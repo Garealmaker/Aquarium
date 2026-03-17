@@ -35,10 +35,12 @@ const els = {
   launcherCloudActions: document.getElementById("launcher-cloud-actions"),
   devServerBlock: document.getElementById("dev-server-block"),
   devLegacyBlock: document.getElementById("dev-legacy-block"),
-  playerNameInput: document.getElementById("player-name-input"),
-  emailInput: document.getElementById("email-input"),
-  birthdayInput: document.getElementById("birthday-input"),
-  passwordInput: document.getElementById("password-input"),
+  signupPlayerNameInput: document.getElementById("signup-player-name-input"),
+  signupEmailInput: document.getElementById("signup-email-input"),
+  signupBirthdayInput: document.getElementById("signup-birthday-input"),
+  signupPasswordInput: document.getElementById("signup-password-input"),
+  loginPlayerNameInput: document.getElementById("login-player-name-input"),
+  loginPasswordInput: document.getElementById("login-password-input"),
   authInlineNote: document.getElementById("auth-inline-note"),
   signupBtn: document.getElementById("signup-btn"),
   loginBtn: document.getElementById("login-btn"),
@@ -130,7 +132,7 @@ function isValidBirthday(value) {
 
 function setAuthBusy(busy, message = "") {
   authBusy = busy;
-  if (message) {
+  if (message && els.authStatus) {
     els.authStatus.textContent = message;
   }
   els.signupBtn.disabled = busy || !isConfigured();
@@ -178,13 +180,27 @@ function scheduleAutoOpen(message = "Session detectee. Ouverture du jeu...") {
     return;
   }
   autoOpenScheduled = true;
-  els.authStatus.textContent = message;
+  if (els.authStatus) {
+    els.authStatus.textContent = message;
+  }
   window.setTimeout(() => {
     autoOpenScheduled = false;
     if (currentSession?.user) {
       openGame();
     }
   }, 550);
+}
+
+function openGameSoon(message = "Connexion reussie. Ouverture du jeu...") {
+  if (!shouldAutoOpenGame()) {
+    return;
+  }
+  if (els.authStatus) {
+    els.authStatus.textContent = message;
+  }
+  window.setTimeout(() => {
+    openGame();
+  }, 180);
 }
 
 function formatDateTime(value) {
@@ -649,18 +665,18 @@ function updateUi() {
   els.serverTogglePlantBtn.disabled = !authenticated || !hasCore || !aquarium || !els.serverPlantSelect.value;
 
   if (!isConfigured()) {
-    els.authStatus.textContent = "Cree `supabase-config.js` a partir du modele, puis recharge la page.";
+    els.authStatus.textContent = "";
     els.coreBadge.textContent = "A configurer";
   } else if (authBusy) {
     els.coreBadge.textContent = "Authentification";
   } else if (!authenticated) {
-    els.authStatus.textContent = "Inscris-toi avec ton mail, puis reconnecte-toi ensuite avec ton pseudo.";
+    els.authStatus.textContent = "";
     els.coreBadge.textContent = "Hors ligne";
   } else if (hasCore) {
-    els.authStatus.textContent = "Session ouverte. Tu peux entrer directement dans le jeu ou ouvrir les options avancees.";
+    els.authStatus.textContent = "";
     els.coreBadge.textContent = "Serveur actif";
   } else {
-    els.authStatus.textContent = "Session ouverte. Initialise ou recharge le noyau serveur.";
+    els.authStatus.textContent = "";
     els.coreBadge.textContent = "Pret";
   }
 
@@ -858,10 +874,10 @@ async function toggleServerPlant() {
 }
 
 async function handleSignup() {
-  const playerName = normalizePlayerName(els.playerNameInput.value);
-  const email = els.emailInput.value.trim();
-  const birthDate = String(els.birthdayInput.value || "").trim();
-  const password = els.passwordInput.value.trim();
+  const playerName = normalizePlayerName(els.signupPlayerNameInput.value);
+  const email = els.signupEmailInput.value.trim();
+  const birthDate = String(els.signupBirthdayInput.value || "").trim();
+  const password = els.signupPasswordInput.value.trim();
   if (!playerName || !email || !birthDate || !password) {
     toast("Renseigne le pseudo, le mail, la date d'anniversaire et le mot de passe.");
     return;
@@ -903,7 +919,7 @@ async function handleSignup() {
       currentSession = data.session;
       toast("Compte cree et session ouverte.");
       updateUi();
-      scheduleAutoOpen("Compte cree. Ouverture du jeu...");
+      openGameSoon("Compte cree. Ouverture du jeu...");
       return;
     }
     toast("Compte cree. Verifie ton email si la confirmation est active dans Supabase.");
@@ -916,8 +932,8 @@ async function handleSignup() {
 }
 
 async function handleLogin() {
-  const playerName = normalizePlayerName(els.playerNameInput.value);
-  const password = els.passwordInput.value.trim();
+  const playerName = normalizePlayerName(els.loginPlayerNameInput.value);
+  const password = els.loginPasswordInput.value.trim();
   if (!playerName || !password) {
     toast("Renseigne ton pseudo et ton mot de passe.");
     return;
@@ -945,7 +961,7 @@ async function handleLogin() {
     }
     toast("Connexion reussie.");
     updateUi();
-    scheduleAutoOpen("Connexion reussie. Ouverture du jeu...");
+    openGameSoon("Connexion reussie. Ouverture du jeu...");
   } catch (error) {
     toast(getFriendlyAuthError(error));
   } finally {
@@ -1123,7 +1139,14 @@ function bindEvents() {
     }
   });
 
-  [els.playerNameInput, els.emailInput, els.birthdayInput, els.passwordInput].forEach((input) => {
+  [
+    els.signupPlayerNameInput,
+    els.signupEmailInput,
+    els.signupBirthdayInput,
+    els.signupPasswordInput,
+    els.loginPlayerNameInput,
+    els.loginPasswordInput,
+  ].forEach((input) => {
     input?.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") {
         return;
