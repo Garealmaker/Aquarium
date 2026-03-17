@@ -16,12 +16,9 @@
         <header class="online-auth-header">
           <p class="eyebrow">Aquariow Online</p>
           <h1>Entre dans ton aquarium</h1>
-          <p class="lead">
-            Cree ton compte a gauche, reconnecte-toi a droite, puis entre directement dans ta version online.
-          </p>
           <div class="online-auth-status-row">
             <span class="badge" id="auth-badge">Hors ligne</span>
-            <span class="online-auth-status" id="auth-status">Configure Supabase puis cree ton compte.</span>
+            <span class="online-auth-status" id="auth-status"></span>
           </div>
         </header>
 
@@ -115,16 +112,13 @@
             <div class="actions launcher-actions auth-main-actions">
               <button class="secondary" id="login-btn">Se connecter</button>
             </div>
-
-            <div class="actions launcher-actions launcher-secondary-actions">
-              <button class="primary" id="open-game-btn" disabled>Continuer vers le jeu</button>
-              <button class="ghost" id="logout-btn" disabled>Se deconnecter</button>
-            </div>
           </article>
         </section>
       </section>
 
       <div hidden aria-hidden="true">
+        <button id="open-game-btn" disabled>Continuer vers le jeu</button>
+        <button id="logout-btn" disabled>Se deconnecter</button>
         <span id="user-email">Aucun</span>
         <span id="last-sync">Jamais</span>
         <span id="local-save-status">Absente</span>
