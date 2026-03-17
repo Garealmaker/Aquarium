@@ -155,12 +155,14 @@ create table if not exists public.owned_plants (
   x_percent numeric(5,2) not null default 50,
   vitality_points integer not null default 10,
   good_cycle_streak integer not null default 0,
+  growth numeric(6,4) not null default 0,
   longevity_cycles_left integer not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table public.owned_plants add column if not exists x_percent numeric(5,2) not null default 50;
+alter table public.owned_plants add column if not exists growth numeric(6,4) not null default 0;
 
 create table if not exists public.fry_batches (
   id uuid primary key default gen_random_uuid(),
@@ -205,13 +207,13 @@ insert into public.fish_species_catalog (
   description
 )
 values
-  ('guppy', 'Guppy', 26, 22, 26, 6.8, 7.8, 0.70, 6, 28, 'vallis-emerald', 'Petit poisson sociable et vif, ideal pour lancer un premier aquarium anime.'),
-  ('betta-splendens', 'Betta splendens', 54, 25, 29, 6.2, 7.4, 1.00, 7, 30, 'lotus-rose', 'Un solitaire elegant, plus contemplatif que rapide, mais tres reactif.'),
-  ('neon-tetra', 'Neon tetra', 32, 22, 26, 6.0, 7.0, 0.60, 4, 29, 'cabomba-feather', 'Un petit nageur de banc tres vif, parfait pour donner du rythme au milieu du bac.'),
-  ('corydoras', 'Corydoras', 44, 22, 27, 6.4, 7.4, 1.40, 7, 36, 'anubia-bronze', 'Poisson de fond robuste et paisible, utile pour apporter de la vie en zone basse.'),
-  ('gourami-perle', 'Gourami perle', 86, 24, 28, 6.4, 7.4, 1.10, 12, 34, 'lotus-rose', 'Un poisson plus impose et pose, ideal pour donner du volume au bac principal.'),
-  ('platy', 'Platy', 36, 22, 26, 7.0, 8.0, 0.90, 7, 32, 'vallis-emerald', 'Un poisson accessible, colore et stable, parfait pour densifier un aquarium jeune.'),
-  ('danio-rerio', 'Danio rerio', 42, 20, 25, 6.5, 7.5, 0.60, 5, 27, 'cabomba-feather', 'Un petit sprinteur de surface, tres nerveux et tres mobile dans le bac.')
+  ('guppy', 'Guppy', 26, 22, 26, 6.8, 7.8, 0.70, 6, 28, 'vallisneria-spiralis', 'Petit poisson sociable et vif, ideal pour lancer un premier aquarium anime.'),
+  ('betta-splendens', 'Betta splendens', 54, 25, 29, 6.2, 7.4, 1.00, 7, 30, 'anubias-nana', 'Un solitaire elegant, plus contemplatif que rapide, mais tres reactif.'),
+  ('neon-tetra', 'Neon tetra', 32, 22, 26, 6.0, 7.0, 0.60, 4, 29, 'microsorum-java', 'Un petit nageur de banc tres vif, parfait pour donner du rythme au milieu du bac.'),
+  ('corydoras', 'Corydoras', 44, 22, 27, 6.4, 7.4, 1.40, 7, 36, 'anubias-nana', 'Poisson de fond robuste et paisible, utile pour apporter de la vie en zone basse.'),
+  ('gourami-perle', 'Gourami perle', 86, 24, 28, 6.4, 7.4, 1.10, 12, 34, 'echinodorus-bleheri', 'Un poisson plus impose et pose, ideal pour donner du volume au bac principal.'),
+  ('platy', 'Platy', 36, 22, 26, 7.0, 8.0, 0.90, 7, 32, 'cryptocoryne-wendtii', 'Un poisson accessible, colore et stable, parfait pour densifier un aquarium jeune.'),
+  ('danio-rerio', 'Danio rerio', 42, 20, 25, 6.5, 7.5, 0.60, 5, 27, 'microsorum-java', 'Un petit sprinteur de surface, tres nerveux et tres mobile dans le bac.')
 on conflict (id) do update
 set
   species = excluded.species,
@@ -313,11 +315,11 @@ insert into public.plant_species_catalog (
   description
 )
 values
-  ('vallis-emerald', 'Vallisneria emeraude', 58, 20, 27, 6.5, 7.8, 3, 5, 3.2, 1.8, 4, 34, 'Une grande plante rubanee qui enrichit l''eau en oxygene.'),
-  ('lotus-rose', 'Lotus rose', 72, 22, 28, 6.2, 7.2, 4, 6, 4.5, 0.7, 8, 29, 'Une fleur delicate qui adore les eaux stables et lumineuses.'),
-  ('anubia-bronze', 'Anubia bronze', 64, 22, 29, 6.0, 7.5, 2, 4, 2.2, 0.95, 7, 36, 'Une plante robuste, parfaite pour stabiliser un aquarium jeune.'),
-  ('cabomba-feather', 'Cabomba plume', 78, 18, 25, 6.0, 7.0, 4, 6, 5.6, 1.55, 3, 28, 'Une tige legere et tres oxygenante qui ondule sans cesse.'),
-  ('kelp-spiral', 'Kelp spiral', 82, 19, 26, 6.4, 7.6, 3, 5, 3.8, 1.2, 5, 31, 'Une silhouette torsadee qui donne du relief et renouvelle l''oxygene.')
+  ('anubias-nana', 'Anubias nana', 42, 22, 28, 6.0, 7.6, 6, 10, 0.3, 0.4, 5, 36, 'Une plante compacte et stable, parfaite pour lancer un aquarium plante sans prise de risque.'),
+  ('microsorum-java', 'Microsorum (fougere de Java)', 54, 22, 28, 6.0, 7.5, 6, 10, 0.4, 0.5, 6, 35, 'Une fougere souple et elegante qui apporte du volume sans trop exiger de CO2.'),
+  ('cryptocoryne-wendtii', 'Cryptocoryne wendtii', 48, 22, 28, 6.2, 7.4, 7, 11, 0.5, 0.6, 6, 34, 'Une plante dense et chaude, ideale pour meubler le milieu du bac avec douceur.'),
+  ('vallisneria-spiralis', 'Vallisneria spiralis', 62, 20, 28, 6.5, 8.0, 8, 12, 0.7, 0.9, 4, 38, 'Une grande rubanee tres vivante qui donne de la hauteur et booste l''oxygene du bac.'),
+  ('echinodorus-bleheri', 'Echinodorus bleheri', 68, 22, 30, 6.5, 7.8, 8, 12, 0.8, 1.0, 7, 37, 'Une grande rosette ample qui structure le bac et offre un excellent rendement en oxygene.')
 on conflict (id) do update
 set
   species = excluded.species,
@@ -333,6 +335,35 @@ set
   comfort_bonus = excluded.comfort_bonus,
   lifespan_cycles = excluded.lifespan_cycles,
   description = excluded.description;
+
+update public.owned_plants
+set species_id = 'anubias-nana'
+where species_id = 'anubia-bronze';
+
+update public.owned_plants
+set species_id = 'microsorum-java'
+where species_id = 'cabomba-feather';
+
+update public.owned_plants
+set species_id = 'cryptocoryne-wendtii'
+where species_id = 'lotus-rose';
+
+update public.owned_plants
+set species_id = 'vallisneria-spiralis'
+where species_id = 'vallis-emerald';
+
+update public.owned_plants
+set species_id = 'echinodorus-bleheri'
+where species_id = 'kelp-spiral';
+
+delete from public.plant_species_catalog
+where id in (
+  'vallis-emerald',
+  'lotus-rose',
+  'anubia-bronze',
+  'cabomba-feather',
+  'kelp-spiral'
+);
 
 insert into public.utility_shop_catalog (
   id,
@@ -927,6 +958,7 @@ as $$
                     'nickname', p.nickname,
                     'depth', p.depth,
                     'x_percent', p.x_percent,
+                    'growth', p.growth,
                     'vitality_points', p.vitality_points,
                     'good_cycle_streak', p.good_cycle_streak,
                     'longevity_cycles_left', p.longevity_cycles_left,
@@ -1054,6 +1086,7 @@ as $$
               'nickname', p.nickname,
               'depth', p.depth,
               'x_percent', p.x_percent,
+              'growth', p.growth,
               'vitality_points', p.vitality_points,
               'good_cycle_streak', p.good_cycle_streak,
               'longevity_cycles_left', p.longevity_cycles_left,
@@ -1099,6 +1132,7 @@ declare
   fish_new_vitality integer;
   plant_new_streak integer;
   fish_new_streak integer;
+  plant_growth_gain numeric := 0;
   fish_new_hunger numeric;
   condition_ratio numeric;
   temp_ok boolean;
@@ -1171,20 +1205,21 @@ begin
     if plant_failures = 0 then
       plant_new_streak := plant_record.good_cycle_streak + 1;
       plant_new_vitality := case when plant_new_streak >= 2 then 10 else plant_record.vitality_points end;
+      plant_growth_gain := 0.09;
     else
       plant_new_streak := 0;
       plant_new_vitality := greatest(0, plant_record.vitality_points - plant_failures);
+      plant_growth_gain := case when plant_failures = 1 then 0.03 else 0 end;
     end if;
 
     update public.owned_plants
     set
       vitality_points = plant_new_vitality,
       good_cycle_streak = plant_new_streak,
+      growth = least(1, greatest(0, coalesce(growth, 0) + plant_growth_gain)),
       longevity_cycles_left = greatest(0, plant_record.longevity_cycles_left - 1),
       updated_at = now()
     where id = plant_record.id;
-
-    ph_drop_total := ph_drop_total + (0.1 + random() * 0.1);
 
     if aquarium_record.light_hours = 0 then
       condition_ratio := 0;
@@ -1205,6 +1240,8 @@ begin
 
     oxygen_output := oxygen_output + (plant_record.oxygen_generation * condition_ratio);
   end loop;
+
+  ph_drop_total := 0.1 + random() * 0.1;
 
   select coalesce(sum(c.oxygen_need), 0)
   into total_fish_oxygen_need
@@ -1963,6 +2000,7 @@ begin
         nickname,
         depth,
         x_percent,
+        growth,
         vitality_points,
         good_cycle_streak,
         longevity_cycles_left
@@ -1973,6 +2011,7 @@ begin
         plant_row.species,
         2,
         50,
+        0,
         10,
         0,
         plant_row.lifespan_cycles

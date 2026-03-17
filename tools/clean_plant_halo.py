@@ -3,32 +3,28 @@ from pathlib import Path
 from PIL import Image
 
 
-ROOT = Path(r"C:\Users\lesci\Documents\Aquariow\assets\fish\Nouveaux")
+ROOT = Path(r"C:\Users\lesci\Documents\Aquariow\assets\plants\Nouveaux")
 FILES = [
-    "Guppy.png",
-    "Betta.png",
-    "Tétra néon.png",
-    "Tetra-neon.png",
-    "Corydoras.png",
-    "Gourami perle.png",
-    "Platy.png",
-    "Danio rerio.png",
+    "Anubias nana.png",
+    "Fougère de Java.png",
+    "Fougere-de-Java.png",
+    "Cryptocoryne wendtii.png",
+    "Vallisneria spiralis.png",
+    "Echinodorus bleheri.png",
 ]
 
 
 def dewhite_channel(channel: int, alpha: int) -> int:
     if alpha <= 0:
         return channel
-    # Remove the white matte often baked into semi-transparent exported PNG edges.
     corrected = round((channel - (255 - alpha)) * 255 / alpha)
     return max(0, min(255, corrected))
 
 
-def soften_white_halo(image: Image.Image) -> Image.Image:
+def clean_image(image: Image.Image) -> Image.Image:
     rgba = image.convert("RGBA")
-    pixels = list(rgba.getdata())
     cleaned = []
-    for red, green, blue, alpha in pixels:
+    for red, green, blue, alpha in rgba.getdata():
         if alpha == 0:
             cleaned.append((0, 0, 0, 0))
             continue
@@ -55,5 +51,4 @@ for file_name in FILES:
     if not path.exists():
         continue
     image = Image.open(path)
-    cleaned = soften_white_halo(image)
-    cleaned.save(path)
+    clean_image(image).save(path)

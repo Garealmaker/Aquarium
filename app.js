@@ -22,7 +22,7 @@ const DEFAULT_FISH_SPRITE = {
   direction: -1,
 };
 const DEFAULT_PLANT_SPRITE = {
-  file: "./assets/plants/anubia-bronze.png",
+  file: "./assets/plants/Nouveaux/Anubias nana.png",
   w: 97,
   h: 181,
   displayHeight: 82,
@@ -44,6 +44,13 @@ const LEGACY_FISH_SPECIES_MAP = {
   "moss-koi": "gourami-perle",
   "pearl-discus": "gourami-perle",
   "reef-angel": "betta-splendens",
+};
+const LEGACY_PLANT_SPECIES_MAP = {
+  "anubia-bronze": "anubias-nana",
+  "cabomba-feather": "microsorum-java",
+  "lotus-rose": "cryptocoryne-wendtii",
+  "vallis-emerald": "vallisneria-spiralis",
+  "kelp-spiral": "echinodorus-bleheri",
 };
 const ALLOWED_PLANT_DEPTHS = [DEPTH_FRONT, DEPTH_MID];
 const MAX_AQUARIUMS = 4;
@@ -617,6 +624,7 @@ function applyServerCoreState(coreState) {
         depth,
         vitality: clamp(numericOr(serverPlant.vitality_points, 10) * HIDDEN_VITALITY_STEP, 0, 100),
         goodCycleStreak: Math.max(0, Math.round(numericOr(serverPlant.good_cycle_streak, existing?.goodCycleStreak ?? 0))),
+        growth: clamp(numericOr(serverPlant.growth, existing?.growth ?? 0), 0, 1),
         longevity: getServerLongevityPercent(
           serverPlant.longevity_cycles_left,
           getPlantLifespanCycles({ speciesId: serverPlant.species_id })
@@ -899,6 +907,7 @@ function createPlacedPlant(speciesId, x, y, depth = DEPTH_MID) {
     depth: placementDepth,
     vitality: 100,
     goodCycleStreak: 0,
+    growth: 0,
     longevity: 100,
     badConditionHours: 0,
     lastCompetitionDateKey: "",
@@ -942,16 +951,18 @@ function normalizePlacedPlants(raw, sourceVersion = SAVE_SCHEMA_VERSION) {
       if (!entry || typeof entry !== "object" || !entry.speciesId) {
         return null;
       }
+      const speciesId = LEGACY_PLANT_SPECIES_MAP[entry.speciesId] || entry.speciesId;
       const placementDepth = normalizePlantDepth(normalizeSceneDepth(entry.depth, sourceVersion));
       return {
-        id: entry.id || `plant-${index}-${entry.speciesId}`,
-        speciesId: entry.speciesId,
-        nickname: entry.nickname || getPlantSpecies(entry.speciesId)?.species || entry.speciesId,
+        id: entry.id || `plant-${index}-${speciesId}`,
+        speciesId,
+        nickname: entry.nickname || getPlantSpecies(speciesId)?.species || speciesId,
         x: clamp(numericOr(entry.x, 50), 6, 94),
         depth: placementDepth,
         y: getPlantSoilY(placementDepth),
         vitality: clamp(numericOr(entry.vitality, 100), 0, 100),
         goodCycleStreak: Math.max(0, Math.round(numericOr(entry.goodCycleStreak, 0))),
+        growth: clamp(numericOr(entry.growth, 0), 0, 1),
         longevity: clamp(numericOr(entry.longevity, 100), 0, 100),
         badConditionHours: Math.max(numericOr(entry.badConditionHours, 0), 0),
         lastCompetitionDateKey: entry.lastCompetitionDateKey || "",
@@ -1420,8 +1431,7 @@ function getPlantBubbleEmitter(plant) {
     return null;
   }
 
-  const species = getPlantSpecies(plant.speciesId);
-  const { sprite, displayHeight, displayWidth } = getPlantRenderMetrics(species);
+  const { sprite, displayHeight, displayWidth } = getPlantRenderMetrics(plant);
   const depthScaleFactor = depthScale(plant.depth);
   const heightPercent = clamp((displayHeight * depthScaleFactor) / 4.2, 9, 28);
   const widthPercent = clamp((displayWidth * depthScaleFactor) / 4.2, 4, 16);
@@ -1502,7 +1512,8 @@ function getFishSpriteConfig(species) {
 }
 
 function getPlantSpecies(speciesId) {
-  return PLANT_SPECIES.find((entry) => entry.id === speciesId) || PLANT_SPECIES[0];
+  const normalizedId = LEGACY_PLANT_SPECIES_MAP[speciesId] || speciesId;
+  return PLANT_SPECIES.find((entry) => entry.id === normalizedId) || PLANT_SPECIES[0];
 }
 
 function normalizePlantDepth(depth) {
@@ -1511,22 +1522,38 @@ function normalizePlantDepth(depth) {
 }
 
 function getPlantSpriteConfig(species) {
-  return {
+  const sprite = {
     ...DEFAULT_PLANT_SPRITE,
     ...(species?.sprite || {}),
   };
+  if (species?.id === "microsorum-java") {
+    sprite.file = "./assets/plants/Nouveaux/Fougere-de-Java.png";
+  }
+  return sprite;
 }
 
-function getPlantRenderMetrics(species, scaleFactor = 1) {
+function getPlantCurrentSizeCm(plantOrSpecies) {
+  const species = plantOrSpecies?.speciesId ? getPlantSpecies(plantOrSpecies.speciesId) : plantOrSpecies;
+  const minSize = numericOr(species?.minSizeCm, 8);
+  const maxSize = numericOr(species?.maxSizeCm, 20);
+  const growthRatio = plantOrSpecies?.speciesId ? clamp(numericOr(plantOrSpecies.growth, 0), 0, 1) : 1;
+  return minSize + (maxSize - minSize) * growthRatio;
+}
+
+function getPlantRenderMetrics(plantOrSpecies, scaleFactor = 1) {
+  const species = plantOrSpecies?.speciesId ? getPlantSpecies(plantOrSpecies.speciesId) : plantOrSpecies;
   const sprite = getPlantSpriteConfig(species);
   const sizeScale = species?.sizeScale || 1;
-  const displayHeight = sprite.displayHeight * sizeScale * 2 * scaleFactor;
+  const maxSize = numericOr(species?.maxSizeCm, 20);
+  const currentSize = getPlantCurrentSizeCm(plantOrSpecies);
+  const sizeRatio = maxSize <= 0 ? 1 : clamp(currentSize / maxSize, 0.18, 1);
+  const displayHeight = sprite.displayHeight * sizeScale * sizeRatio * 2 * scaleFactor;
   const displayWidth = Math.max(displayHeight * (sprite.w / sprite.h), displayHeight * 0.38);
   return { sprite, displayHeight, displayWidth };
 }
 
-function getPlantFloorOffset(species, depth, scaleFactor = 1) {
-  const { sprite, displayHeight } = getPlantRenderMetrics(species, scaleFactor);
+function getPlantFloorOffset(plantOrSpecies, depth, scaleFactor = 1) {
+  const { sprite, displayHeight } = getPlantRenderMetrics(plantOrSpecies, scaleFactor);
   const rootRatio = clamp((sprite.rootCut || 20) / 100, 0.1, 0.28);
   const buryByDepth = {
     [DEPTH_FRONT]: 0.92,
@@ -1561,8 +1588,9 @@ function applyFishSpriteNode(node, species, className) {
   node.style.setProperty("--tail-joint", `${sprite.tailJoint}%`);
 }
 
-function applyPlantSpriteNode(node, species, scaleFactor = 1) {
-  const { sprite, displayHeight, displayWidth } = getPlantRenderMetrics(species, scaleFactor);
+function applyPlantSpriteNode(node, plantOrSpecies, scaleFactor = 1) {
+  const species = plantOrSpecies?.speciesId ? getPlantSpecies(plantOrSpecies.speciesId) : plantOrSpecies;
+  const { sprite, displayHeight, displayWidth } = getPlantRenderMetrics(plantOrSpecies, scaleFactor);
 
   node.className = `plant-piece species-${species.id}`;
   if (node.childElementCount !== 2) {
@@ -2167,7 +2195,7 @@ function applyCycleToBundle(bundle, reason = "manual") {
   const hungerDrop = randomBetween(9, 20);
   const filterReduction = getFilterEfficiency();
   const waterQualityDrop = (randomBetween(5, 11) + feedUsesThisCycle) * (1 - filterReduction);
-  const phDrop = plantsPlaced.reduce((sum) => sum + randomBetween(0.1, 0.2), 0);
+  const phDrop = randomBetween(0.1, 0.2);
   aquarium.foodResidue = clamp(aquarium.foodResidue + fish.length * 2.4, 0, 100);
   aquarium.waterQuality = clamp(aquarium.waterQuality - waterQualityDrop, 0, 100);
   aquarium.pollution = clamp(100 - aquarium.waterQuality, 0, 100);
@@ -2180,6 +2208,8 @@ function applyCycleToBundle(bundle, reason = "manual") {
   plantsPlaced = plantsPlaced.map((plant) => {
     const missingConditions = getPlantMissingConditionCount(plant, aquarium, plantsPlaced);
     const nextGoodCycleStreak = missingConditions === 0 ? numericOr(plant.goodCycleStreak, 0) + 1 : 0;
+    const healthy = missingConditions === 0;
+    const growthGain = healthy ? 0.09 : missingConditions === 1 ? 0.03 : 0;
     const vitality =
       nextGoodCycleStreak >= 2
         ? 100
@@ -2188,6 +2218,7 @@ function applyCycleToBundle(bundle, reason = "manual") {
       ...plant,
       vitality,
       goodCycleStreak: nextGoodCycleStreak,
+      growth: clamp(numericOr(plant.growth, 0) + growthGain, 0, 1),
       longevity: clamp(plant.longevity - 100 / getPlantLifespanCycles(plant), 0, 100),
       badConditionHours: missingConditions === 0 ? 0 : plant.badConditionHours + CYCLE_STEP_HOURS,
     };
@@ -2315,7 +2346,9 @@ function normalizePlantInventory(rawPlantsOwned) {
   if (!Array.isArray(rawPlantsOwned)) {
     return [];
   }
-  return rawPlantsOwned.filter((plantId) => PLANT_SPECIES.some((species) => species.id === plantId));
+  return rawPlantsOwned
+    .map((plantId) => LEGACY_PLANT_SPECIES_MAP[plantId] || plantId)
+    .filter((plantId) => PLANT_SPECIES.some((species) => species.id === plantId));
 }
 
 function getOwnedPlantCount(speciesId) {
@@ -2433,10 +2466,10 @@ function getFishOxygenDemandLabel(fishOrSpecies) {
 function getPlantCo2DemandLabel(plantOrSpecies) {
   const species = plantOrSpecies?.speciesId ? getPlantSpecies(plantOrSpecies.speciesId) : plantOrSpecies;
   const co2Need = numericOr(species?.co2Need, 3);
-  if (co2Need >= 5) {
+  if (co2Need >= 0.75) {
     return "CO2 eleve";
   }
-  if (co2Need >= 3.5) {
+  if (co2Need >= 0.45) {
     return "CO2 moyen";
   }
   return "CO2 leger";
@@ -2445,10 +2478,10 @@ function getPlantCo2DemandLabel(plantOrSpecies) {
 function getPlantOxygenLabel(plantOrSpecies) {
   const species = plantOrSpecies?.speciesId ? getPlantSpecies(plantOrSpecies.speciesId) : plantOrSpecies;
   const oxygenGeneration = numericOr(species?.oxygenGeneration, 1);
-  if (oxygenGeneration >= 1.5) {
+  if (oxygenGeneration >= 1.0) {
     return "O2 fort";
   }
-  if (oxygenGeneration >= 1) {
+  if (oxygenGeneration >= 0.55) {
     return "O2 moyen";
   }
   return "O2 discret";
@@ -3373,6 +3406,7 @@ function renderPlantCards() {
       <div class="fish-meta">${careState.label} - profondeur ${depthLabel}</div>
       <div class="fish-health-line">${careState.detail}</div>
       <div class="fish-health-line">Besoins: ${getPlantNeedSummary(species)}</div>
+      <div class="fish-health-line">Taille ${getPlantCurrentSizeCm(plant).toFixed(1).replace(".", ",")} cm / ${numericOr(species.maxSizeCm, 20)} cm</div>
       <div class="fish-health-line">${renderInfoChipRow(getPlantProfileBadges(species))}</div>
       <div class="fish-health-line">Effet: ${getPlantOxygenLabel(species)} - protection alevins ${species.fryProtection || 0}</div>
     `;
@@ -3577,9 +3611,7 @@ function renderPlacementPanel() {
 
 function getPlantCollisionZone(speciesId, depth) {
   const species = getPlantSpecies(speciesId);
-  const sprite = getPlantSpriteConfig(species);
-  const sizeScale = species?.sizeScale || 1;
-  const height = sprite.displayHeight * sizeScale * 2;
+  const { displayHeight: height } = getPlantRenderMetrics(species);
   const scale = depthScale(depth);
   return {
     x: clamp((height / 12) * scale, 5.5, 10.5),
@@ -3627,9 +3659,8 @@ function syncDecorNodes() {
     const node = document.createElement("div");
     const scale = depthScale(placement.depth);
     const brightness = depthBrightness(placement.depth);
-    const species = getPlantSpecies(placement.speciesId);
-    const floorOffset = getPlantFloorOffset(species, placement.depth);
-    applyPlantSpriteNode(node, species);
+    const floorOffset = getPlantFloorOffset(placement, placement.depth);
+    applyPlantSpriteNode(node, placement);
     node.style.setProperty("--plant-delay", `${placement.index * -0.42}s`);
 
     node.style.left = `${placement.x}%`;
