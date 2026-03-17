@@ -80,13 +80,27 @@ body::after {
 .topbar {
   align-items: center;
   justify-content: flex-end;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
   backdrop-filter: none;
   box-shadow: none;
+}
+
+.topbar-session-btn {
+  min-width: 170px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(6, 33, 58, 0.78);
+  color: var(--text-main);
+  box-shadow: 0 12px 28px rgba(1, 12, 21, 0.18);
+}
+
+.topbar-session-btn:hover {
+  background: rgba(11, 47, 78, 0.9);
 }
 
 .brand-chip {
