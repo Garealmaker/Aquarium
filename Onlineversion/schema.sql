@@ -205,16 +205,13 @@ insert into public.fish_species_catalog (
   description
 )
 values
-  ('golden-guppy', 'Guppy dore', 0, 22, 26, 6.8, 7.8, 1.00, 4, 28, 'vallis-emerald', 'Petit poisson sociable parfait pour lancer un elevage vivant.'),
-  ('sun-cory', 'Cory solaire', 0, 24, 28, 6.6, 7.4, 1.20, 6, 31, 'anubia-bronze', 'Un poisson de fond qui aide a garder un bac calme et stable.'),
-  ('moon-betta', 'Betta lunaire', 0, 25, 29, 6.2, 7.4, 1.10, 7, 34, 'lotus-rose', 'Un nageur de prestige qui attire les visiteurs du port.'),
-  ('coral-clown', 'Clown corallien', 0, 24, 27, 6.8, 7.6, 1.30, 8, 30, 'anubia-bronze', 'Une star chaleureuse ideale pour les aquariums lumineux.'),
-  ('glass-tetra', 'Tetra de verre', 0, 21, 24, 6.0, 7.2, 0.90, 5, 27, 'cabomba-feather', 'Sa silhouette translucide donne une allure haut de gamme au bac.'),
-  ('moss-koi', 'Koi mousse', 0, 20, 24, 7.0, 8.0, 2.30, 12, 36, 'lotus-rose', 'Un grand nageur calme qui renforce la valeur contemplative du recif.'),
-  ('pearl-discus', 'Discus perle', 0, 27, 30, 6.0, 7.0, 1.90, 15, 35, 'anubia-bronze', 'Un disque raffine qui fait monter la reputation du gardien.'),
-  ('reef-angel', 'Ange de recif', 0, 24, 27, 6.4, 7.4, 2.00, 14, 33, 'kelp-spiral', 'Une vedette majestueuse qui rapporte de belles perles.'),
-  ('ember-rasbora', 'Rasbora braise', 0, 23, 27, 6.6, 7.6, 0.80, 3, 29, 'cabomba-feather', 'Un poisson vif qui donne du rythme a la scene principale.'),
-  ('starlight-gourami', 'Gourami stellaire', 0, 25, 28, 6.5, 7.5, 1.40, 10, 32, 'lotus-rose', 'Ses reflets lumineux rendent chaque visite plus memorable.')
+  ('guppy', 'Guppy', 26, 22, 26, 6.8, 7.8, 0.70, 6, 28, 'vallis-emerald', 'Petit poisson sociable et vif, ideal pour lancer un premier aquarium anime.'),
+  ('betta-splendens', 'Betta splendens', 54, 25, 29, 6.2, 7.4, 1.00, 7, 30, 'lotus-rose', 'Un solitaire elegant, plus contemplatif que rapide, mais tres reactif.'),
+  ('neon-tetra', 'Neon tetra', 32, 22, 26, 6.0, 7.0, 0.60, 4, 29, 'cabomba-feather', 'Un petit nageur de banc tres vif, parfait pour donner du rythme au milieu du bac.'),
+  ('corydoras', 'Corydoras', 44, 22, 27, 6.4, 7.4, 1.40, 7, 36, 'anubia-bronze', 'Poisson de fond robuste et paisible, utile pour apporter de la vie en zone basse.'),
+  ('gourami-perle', 'Gourami perle', 86, 24, 28, 6.4, 7.4, 1.10, 12, 34, 'lotus-rose', 'Un poisson plus impose et pose, ideal pour donner du volume au bac principal.'),
+  ('platy', 'Platy', 36, 22, 26, 7.0, 8.0, 0.90, 7, 32, 'vallis-emerald', 'Un poisson accessible, colore et stable, parfait pour densifier un aquarium jeune.'),
+  ('danio-rerio', 'Danio rerio', 42, 20, 25, 6.5, 7.5, 0.60, 5, 27, 'cabomba-feather', 'Un petit sprinteur de surface, tres nerveux et tres mobile dans le bac.')
 on conflict (id) do update
 set
   species = excluded.species,
@@ -228,6 +225,76 @@ set
   lifespan_cycles = excluded.lifespan_cycles,
   preferred_plant_id = excluded.preferred_plant_id,
   description = excluded.description;
+
+update public.owned_fish
+set species_id = 'guppy'
+where species_id = 'golden-guppy';
+
+update public.owned_fish
+set species_id = 'betta-splendens'
+where species_id in ('moon-betta', 'reef-angel');
+
+update public.owned_fish
+set species_id = 'neon-tetra'
+where species_id = 'glass-tetra';
+
+update public.owned_fish
+set species_id = 'corydoras'
+where species_id = 'sun-cory';
+
+update public.owned_fish
+set species_id = 'gourami-perle'
+where species_id in ('starlight-gourami', 'moss-koi', 'pearl-discus');
+
+update public.owned_fish
+set species_id = 'platy'
+where species_id = 'coral-clown';
+
+update public.owned_fish
+set species_id = 'danio-rerio'
+where species_id = 'ember-rasbora';
+
+update public.fry_batches
+set species_id = 'guppy'
+where species_id = 'golden-guppy';
+
+update public.fry_batches
+set species_id = 'betta-splendens'
+where species_id in ('moon-betta', 'reef-angel');
+
+update public.fry_batches
+set species_id = 'neon-tetra'
+where species_id = 'glass-tetra';
+
+update public.fry_batches
+set species_id = 'corydoras'
+where species_id = 'sun-cory';
+
+update public.fry_batches
+set species_id = 'gourami-perle'
+where species_id in ('starlight-gourami', 'moss-koi', 'pearl-discus');
+
+update public.fry_batches
+set species_id = 'platy'
+where species_id = 'coral-clown';
+
+update public.fry_batches
+set species_id = 'danio-rerio'
+where species_id = 'ember-rasbora';
+
+delete from public.fish_species_catalog
+where id in (
+  'golden-guppy',
+  'sun-cory',
+  'moon-betta',
+  'coral-clown',
+  'glass-tetra',
+  'moss-koi',
+  'pearl-discus',
+  'reef-angel',
+  'ember-rasbora',
+  'starlight-gourami'
+);
 
 insert into public.plant_species_catalog (
   id,

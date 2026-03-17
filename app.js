@@ -13,7 +13,7 @@ const MISSION_POOL = GAME_CONTENT.missionPool || [];
 const MISSION_TRACKERS = GAME_CONTENT.missionTrackers || [];
 const FISH_NAME_PARTS = GAME_CONTENT.fishNames || { prefixes: [], suffixes: [], babies: [] };
 const DEFAULT_FISH_SPRITE = {
-  file: "./assets/fish/coral-clown.png",
+  file: "./assets/fish/Nouveaux/Guppy.png",
   w: 175,
   h: 111,
   tailSplit: 73,
@@ -33,6 +33,18 @@ const DEFAULT_PLANT_SPRITE = {
 const DEPTH_FRONT = 1;
 const DEPTH_MID = 2;
 const DEPTH_BACK = 3;
+const LEGACY_FISH_SPECIES_MAP = {
+  "golden-guppy": "guppy",
+  "moon-betta": "betta-splendens",
+  "glass-tetra": "neon-tetra",
+  "sun-cory": "corydoras",
+  "starlight-gourami": "gourami-perle",
+  "ember-rasbora": "danio-rerio",
+  "coral-clown": "platy",
+  "moss-koi": "gourami-perle",
+  "pearl-discus": "gourami-perle",
+  "reef-angel": "betta-splendens",
+};
 const ALLOWED_PLANT_DEPTHS = [DEPTH_FRONT, DEPTH_MID];
 const MAX_AQUARIUMS = 4;
 const CYCLE_MINUTES = 120;
@@ -571,6 +583,8 @@ function applyServerCoreState(coreState) {
 
     const nextFish = (serverAquarium.fish || []).map((serverFish) => {
       const existing = previousFishMap.get(serverFish.id);
+      const species = getSpecies(serverFish.species_id);
+      const adultSizeCm = numericOr(species?.adultSizeCm, 8);
       return createFish(serverFish.species_id, {
         ...existing,
         id: serverFish.id,
@@ -584,8 +598,8 @@ function applyServerCoreState(coreState) {
         ),
         comfort: numericOr(existing?.comfort, 72),
         growth: numericOr(existing?.growth, 0),
-        speedSkill: numericOr(existing?.speedSkill, 18),
-        reflexSkill: numericOr(existing?.reflexSkill, 56),
+        speedSkill: numericOr(existing?.speedSkill, numericOr(species?.speed, 18 + adultSizeCm * 2)),
+        reflexSkill: numericOr(existing?.reflexSkill, numericOr(species?.reflex, 56 - adultSizeCm * 1.4)),
         addedAt: numericOr(existing?.addedAt, Date.now()),
       });
     });
@@ -850,12 +864,13 @@ async function runServerBridgeAction(executor, successMessage, options = {}) {
 }
 
 function createFish(speciesId, overrides = {}) {
-  const species = SPECIES.find((entry) => entry.id === speciesId) || SPECIES[0];
+  const normalizedSpeciesId = LEGACY_FISH_SPECIES_MAP[speciesId] || speciesId;
+  const species = SPECIES.find((entry) => entry.id === normalizedSpeciesId) || SPECIES[0];
   const now = overrides.addedAt || Date.now();
   const adultSizeCm = numericOr(species?.adultSizeCm, 8);
   return {
     id: overrides.id || `fish-${now}-${Math.random().toString(16).slice(2, 8)}`,
-    speciesId,
+    speciesId: species.id,
     nickname: overrides.nickname || generateFishName(),
     ageHours: overrides.ageHours ?? 0,
     hunger: overrides.hunger ?? 82,
@@ -865,8 +880,8 @@ function createFish(speciesId, overrides = {}) {
     newcomerHours: overrides.newcomerHours ?? 18,
     badConditionHours: overrides.badConditionHours ?? 0,
     growth: overrides.growth ?? 0,
-    speedSkill: overrides.speedSkill ?? clamp(Math.round(18 + adultSizeCm * 2), 5, 95),
-    reflexSkill: overrides.reflexSkill ?? clamp(Math.round(56 - adultSizeCm * 1.4), 5, 95),
+    speedSkill: overrides.speedSkill ?? clamp(Math.round(numericOr(species?.speed, 18 + adultSizeCm * 2)), 5, 95),
+    reflexSkill: overrides.reflexSkill ?? clamp(Math.round(numericOr(species?.reflex, 56 - adultSizeCm * 1.4)), 5, 95),
     longevity: overrides.longevity ?? 100,
     lastCompetitionDateKey: overrides.lastCompetitionDateKey || "",
     addedAt: now,
@@ -956,10 +971,11 @@ function normalizeFishState(raw) {
       if (!entry || typeof entry !== "object" || !entry.speciesId) {
         return null;
       }
-      const species = SPECIES.find((candidate) => candidate.id === entry.speciesId) || SPECIES[0];
+      const normalizedSpeciesId = LEGACY_FISH_SPECIES_MAP[entry.speciesId] || entry.speciesId;
+      const species = SPECIES.find((candidate) => candidate.id === normalizedSpeciesId) || SPECIES[0];
       const adultSizeCm = numericOr(species?.adultSizeCm, 8);
 
-      return createFish(entry.speciesId, {
+      return createFish(normalizedSpeciesId, {
         id: entry.id,
         nickname: entry.nickname,
         ageHours: numericOr(entry.ageHours, 0),
@@ -977,8 +993,8 @@ function normalizeFishState(raw) {
         newcomerHours: Math.max(numericOr(entry.newcomerHours, 0), 0),
         badConditionHours: Math.max(numericOr(entry.badConditionHours, 0), 0),
         growth: clamp(numericOr(entry.growth, 0), 0, 1),
-        speedSkill: clamp(numericOr(entry.speedSkill, 18 + adultSizeCm * 2), 0, 100),
-        reflexSkill: clamp(numericOr(entry.reflexSkill, 56 - adultSizeCm * 1.4), 0, 100),
+        speedSkill: clamp(numericOr(entry.speedSkill, numericOr(species?.speed, 18 + adultSizeCm * 2)), 0, 100),
+        reflexSkill: clamp(numericOr(entry.reflexSkill, numericOr(species?.reflex, 56 - adultSizeCm * 1.4)), 0, 100),
         longevity: clamp(numericOr(entry.longevity, 100), 0, 100),
         lastCompetitionDateKey: entry.lastCompetitionDateKey || "",
         addedAt: entry.addedAt || Date.now(),
@@ -1473,9 +1489,15 @@ function spawnBubbleActor(actor) {
 }
 
 function getFishSpriteConfig(species) {
-  return {
+  const sprite = {
     ...DEFAULT_FISH_SPRITE,
     ...(species?.sprite || {}),
+  };
+  if (species?.id === "neon-tetra") {
+    sprite.file = "./assets/fish/Nouveaux/Tetra-neon.png";
+  }
+  return {
+    ...sprite,
   };
 }
 
@@ -1968,6 +1990,9 @@ function getPlantCo2Need(plant) {
 
 function getFishOxygenNeed(fish) {
   const species = getSpecies(fish.speciesId);
+  if (species?.oxygenPerCycle !== undefined && species?.oxygenPerCycle !== null) {
+    return numericOr(species.oxygenPerCycle, 0.8);
+  }
   const sizeFactor = numericOr(species.sizeScale, 1);
   const oxygenTargetFactor = clamp(numericOr(species.oxygenMin, 50) / 100, 0.2, 1);
   return 0.45 + sizeFactor * 0.5 + oxygenTargetFactor * 0.85;
@@ -2379,6 +2404,19 @@ function renderInfoChipRow(labels) {
 
 function getFishOxygenDemandLabel(fishOrSpecies) {
   const species = fishOrSpecies?.speciesId ? getSpecies(fishOrSpecies.speciesId) : fishOrSpecies;
+  const oxygenPerCycle = numericOr(species?.oxygenPerCycle, NaN);
+  if (Number.isFinite(oxygenPerCycle)) {
+    if (oxygenPerCycle >= 1.25) {
+      return "O2 eleve";
+    }
+    if (oxygenPerCycle >= 1) {
+      return "O2 soutenu";
+    }
+    if (oxygenPerCycle >= 0.75) {
+      return "O2 modere";
+    }
+    return "O2 leger";
+  }
   const oxygenMin = numericOr(species?.oxygenMin, 50);
   if (oxygenMin >= 62) {
     return "O2 eleve";
@@ -2767,9 +2805,10 @@ function getFishHealthLabel(fish) {
 
 function getFishCurrentSizeCm(fish) {
   const species = getSpecies(fish.speciesId);
+  const minSize = numericOr(species.minSizeCm, 1);
   const adultSize = numericOr(species.adultSizeCm, 8);
   const growthRatio = clamp(fish.growth, 0, 1);
-  return 1 + (adultSize - 1) * growthRatio;
+  return minSize + (adultSize - minSize) * growthRatio;
 }
 
 function getPreferredPlantSupport(fish) {
@@ -4306,7 +4345,8 @@ function eligibleBreeders() {
 }
 
 function getSpecies(speciesId) {
-  return SPECIES.find((entry) => entry.id === speciesId) || SPECIES[0];
+  const normalizedSpeciesId = LEGACY_FISH_SPECIES_MAP[speciesId] || speciesId;
+  return SPECIES.find((entry) => entry.id === normalizedSpeciesId) || SPECIES[0];
 }
 
 function plantConditionsMet(plant, aquarium = state.aquarium) {
@@ -5466,12 +5506,12 @@ function generateInitialFeed() {
     },
     {
       author: "Naya",
-      message: "Les guppys dores font de super premiers compagnons pour relancer un bac.",
+      message: "Les guppys font de super premiers compagnons pour relancer un bac.",
       when: "Il y a 1 h",
     },
     {
       author: "Thea",
-      message: "Je cherche toujours des bettas lunaires a admirer pendant la Nuit des perles.",
+      message: "Je cherche toujours de beaux bettas splendens a admirer pendant la Nuit des perles.",
       when: "Il y a 3 h",
     },
   ];

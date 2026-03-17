@@ -1144,9 +1144,20 @@ function bindEvents() {
     els.signupEmailInput,
     els.signupBirthdayInput,
     els.signupPasswordInput,
-    els.loginPlayerNameInput,
-    els.loginPasswordInput,
   ].forEach((input) => {
+    input?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") {
+        return;
+      }
+      event.preventDefault();
+      if (authBusy) {
+        return;
+      }
+      handleSignup();
+    });
+  });
+
+  [els.loginPlayerNameInput, els.loginPasswordInput].forEach((input) => {
     input?.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") {
         return;

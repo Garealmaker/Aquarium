@@ -1106,7 +1106,7 @@ button:disabled {
   transform-origin: center;
   will-change: transform, left, top, opacity;
   pointer-events: none;
-  --sprite-image: url("./assets/fish/coral-clown.png");
+  --sprite-image: url("./assets/fish/Nouveaux/Guppy.png");
   --tail-split: 72%;
   --tail-joint: 67%;
   --tail-idle-angle: 1.8deg;
