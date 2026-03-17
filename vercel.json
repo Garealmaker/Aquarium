@@ -1,0 +1,28 @@
+{
+  "rewrites": [
+    {
+      "source": "/online",
+      "destination": "/Onlineversion/index.html"
+    },
+    {
+      "source": "/online/",
+      "destination": "/Onlineversion/index.html"
+    },
+    {
+      "source": "/online/index.html",
+      "destination": "/Onlineversion/index.html"
+    },
+    {
+      "source": "/online/game",
+      "destination": "/Onlineversion/game.html"
+    },
+    {
+      "source": "/online/game.html",
+      "destination": "/Onlineversion/game.html"
+    },
+    {
+      "source": "/online/:path*",
+      "destination": "/Onlineversion/:path*"
+    }
+  ]
+}

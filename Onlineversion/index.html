@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aquariow Online</title>
+    <meta
+      name="description"
+      content="Version online d'Aquariow avec compte joueur, sauvegarde cloud et progression serveur."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page-shell launcher-shell">
+      <section class="hero-card launcher-hero">
+        <div class="launcher-hero-copy">
+          <p class="eyebrow">Aquariow Online</p>
+          <h1>Entre dans Aquariow Online</h1>
+          <p class="lead">
+            Cree ton compte, retrouve ton profil, puis ouvre directement ton aquarium dans sa
+            version serveur.
+          </p>
+
+          <div class="launcher-pill-row">
+            <span class="hero-badge">Compte joueur</span>
+            <span class="hero-badge">Sauvegarde cloud</span>
+            <span class="hero-badge">Aquariums connectes</span>
+          </div>
+
+          <div class="launcher-feature-grid">
+            <article>
+              <span>1</span>
+              <strong>Inscription complete</strong>
+              <p>Mail, pseudo, anniversaire et mot de passe sont enregistres des le depart.</p>
+            </article>
+            <article>
+              <span>2</span>
+              <strong>Connexion simple</strong>
+              <p>Ensuite, ton pseudo et ton mot de passe suffisent pour revenir jouer.</p>
+            </article>
+            <article>
+              <span>3</span>
+              <strong>Progression preservee</strong>
+              <p>Le serveur reste la source principale pour ton profil et tes aquariums.</p>
+            </article>
+          </div>
+        </div>
+
+        <article class="card launcher-sidecard">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Session</p>
+              <h2>Etat courant</h2>
+            </div>
+            <span class="badge" id="auth-badge">Hors ligne</span>
+          </div>
+
+          <div class="summary-grid launcher-summary-grid">
+            <div>
+              <span>Compte</span>
+              <strong id="user-email">Aucun</strong>
+            </div>
+            <div>
+              <span>Derniere sync</span>
+              <strong id="last-sync">Jamais</strong>
+            </div>
+            <div>
+              <span>Cache local</span>
+              <strong id="local-save-status">Absente</strong>
+            </div>
+            <div>
+              <span>Etat cloud</span>
+              <strong id="remote-save-status">Inconnu</strong>
+            </div>
+          </div>
+
+          <p class="note launcher-note" id="auth-status">
+            Configure d'abord `supabase-config.js`, puis cree un compte de test.
+          </p>
+        </article>
+      </section>
+
+      <section class="launcher-grid">
+        <article class="card auth-card">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Compte</p>
+              <h2>Entre dans ton aquarium</h2>
+            </div>
+          </div>
+
+          <div class="stack">
+            <label class="field">
+              <span>Pseudo</span>
+              <input id="player-name-input" type="text" placeholder="Nom de joueur" maxlength="26" autocomplete="username" />
+            </label>
+
+            <label class="field">
+              <span>Adresse mail</span>
+              <input id="email-input" type="email" placeholder="toi@exemple.com" autocomplete="email" />
+            </label>
+
+            <label class="field">
+              <span>Date d'anniversaire</span>
+              <input id="birthday-input" type="date" max="2099-12-31" />
+            </label>
+
+            <label class="field">
+              <span>Mot de passe</span>
+              <input
+                id="password-input"
+                type="password"
+                placeholder="Minimum 6 caracteres"
+                autocomplete="current-password"
+              />
+            </label>
+          </div>
+
+          <p class="note auth-inline-note" id="auth-inline-note">
+            Crée ton compte ou connecte-toi pour retrouver immédiatement ta progression en ligne.
+          </p>
+
+          <div class="actions launcher-actions auth-main-actions">
+            <button class="primary" id="signup-btn">Creer un compte</button>
+            <button class="secondary" id="login-btn">Se connecter</button>
+          </div>
+
+          <div class="actions launcher-actions launcher-secondary-actions">
+            <button class="primary" id="open-game-btn" disabled>Continuer vers le jeu</button>
+            <button class="ghost" id="logout-btn" disabled>Se deconnecter</button>
+          </div>
+        </article>
+
+        <article class="card launcher-quickpanel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Acces rapide</p>
+              <h2>Resume de ton compte</h2>
+            </div>
+          </div>
+
+          <div class="summary-grid" id="save-summary">
+            <div>
+              <span>Joueur</span>
+              <strong>-</strong>
+            </div>
+            <div>
+              <span>Aquariums</span>
+              <strong>-</strong>
+            </div>
+            <div>
+              <span>Poissons</span>
+              <strong>-</strong>
+            </div>
+            <div>
+              <span>Plantes</span>
+              <strong>-</strong>
+            </div>
+            <div>
+              <span>Coquillages</span>
+              <strong>-</strong>
+            </div>
+            <div>
+              <span>Perles</span>
+              <strong>-</strong>
+            </div>
+          </div>
+
+          <div class="quick-actions-grid" id="launcher-cloud-actions" hidden>
+            <button class="secondary" id="pull-cloud-btn" disabled>Recharger le cloud</button>
+            <button class="secondary" id="write-browser-btn" disabled>Appliquer au navigateur</button>
+          </div>
+
+          <p class="note quickpanel-note">
+            Le jeu online utilise l'etat serveur en priorite. Les outils techniques restent reserves au mode dev.
+          </p>
+        </article>
+      </section>
+
+      <details class="card advanced-block" id="dev-server-block" hidden>
+        <summary class="advanced-summary">
+          <div>
+            <p class="eyebrow">Options avancees</p>
+            <h2>Laboratoire serveur</h2>
+          </div>
+          <span class="badge" id="core-badge">Non initialise</span>
+        </summary>
+
+        <div class="advanced-body">
+          <p class="note" id="core-status">
+            Cette zone permet encore de tester le noyau serveur en direct, sans passer uniquement par
+            l'interface du jeu.
+          </p>
+
+          <div class="actions wrap">
+            <button class="primary" id="bootstrap-core-btn" disabled>Initialiser le noyau serveur</button>
+            <button class="secondary" id="reload-core-btn" disabled>Recharger l'etat serveur</button>
+            <button class="secondary" id="advance-core-cycle-btn" disabled>Passer le cycle cote serveur</button>
+          </div>
+
+          <div class="field">
+            <span>Aquarium serveur actif</span>
+            <select id="core-aquarium-select" disabled></select>
+          </div>
+
+          <div class="summary-grid" id="core-summary">
+            <div>
+              <span>Joueur</span>
+              <strong>-</strong>
+            </div>
+            <div>
+              <span>Perles</span>
+              <strong>-</strong>
+            </div>
+            <div>
+              <span>Aquarium serveur</span>
+              <strong>-</strong>
+            </div>
+            <div>
+              <span>Cycle serveur</span>
+              <strong>-</strong>
+            </div>
+            <div>
+              <span>Temps restant</span>
+              <strong>-</strong>
+            </div>
+            <div>
+              <span>Eau serveur</span>
+              <strong>-</strong>
+            </div>
+          </div>
+
+          <div class="grid two-cols server-grid">
+            <article class="card server-subcard">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">Boutique serveur</p>
+                <h2>Achats</h2>
+              </div>
+            </div>
+
+            <div class="stack">
+              <label class="field">
+                <span>Categorie</span>
+                <select id="server-shop-category" disabled>
+                  <option value="fish">Poissons</option>
+                  <option value="plant">Plantes</option>
+                  <option value="utility">Utilitaires</option>
+                  <option value="equipment">Equipements</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Article</span>
+                <select id="server-shop-select" disabled></select>
+              </label>
+            </div>
+
+            <div class="actions wrap">
+              <button class="primary" id="server-buy-btn" disabled>Acheter cote serveur</button>
+            </div>
+            </article>
+
+            <article class="card server-subcard">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">Reglages bac</p>
+                <h2>Temperature et lumiere</h2>
+              </div>
+            </div>
+
+            <div class="stack">
+              <label class="field">
+                <span>Temperature cible (20 a 30)</span>
+                <input id="server-temperature-input" type="number" min="20" max="30" step="1" />
+              </label>
+
+              <label class="field">
+                <span>Lumiere (0 au max de la lampe)</span>
+                <input id="server-light-input" type="number" min="0" max="6" step="1" />
+              </label>
+            </div>
+
+            <div class="actions wrap">
+              <button class="secondary" id="server-apply-temperature-btn" disabled>Appliquer temperature</button>
+              <button class="secondary" id="server-apply-light-btn" disabled>Appliquer lumiere</button>
+            </div>
+            </article>
+          </div>
+
+          <div class="grid two-cols server-grid">
+            <article class="card server-subcard">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">Inventaire serveur</p>
+                <h2>Utilitaires</h2>
+              </div>
+            </div>
+
+            <label class="field">
+              <span>Utilitaire disponible</span>
+              <select id="server-utility-select" disabled></select>
+            </label>
+
+            <div class="actions wrap">
+              <button class="secondary" id="server-use-utility-btn" disabled>Utiliser sur le bac</button>
+            </div>
+
+            <div class="server-list" id="server-utility-list"></div>
+            </article>
+
+            <article class="card server-subcard">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">Poissons / plantes</p>
+                <h2>Placement serveur</h2>
+              </div>
+            </div>
+
+            <div class="stack">
+              <label class="field">
+                <span>Poisson</span>
+                <select id="server-fish-select" disabled></select>
+              </label>
+
+              <div class="actions wrap">
+                <button class="secondary" id="server-toggle-fish-btn" disabled>Placer ou retirer le poisson</button>
+              </div>
+
+              <label class="field">
+                <span>Plante</span>
+                <select id="server-plant-select" disabled></select>
+              </label>
+
+              <label class="field">
+                <span>Profondeur plante</span>
+                <select id="server-plant-depth-select" disabled>
+                  <option value="1">P1 - Avant</option>
+                  <option value="2">P2 - Milieu</option>
+                </select>
+              </label>
+
+              <div class="actions wrap">
+                <button class="secondary" id="server-toggle-plant-btn" disabled>Planter ou retirer</button>
+              </div>
+            </div>
+            </article>
+          </div>
+
+          <div class="grid two-cols server-grid">
+            <article class="card server-subcard">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">Bac serveur</p>
+                <h2>Poissons places</h2>
+              </div>
+            </div>
+            <div class="server-list" id="server-fish-list"></div>
+            </article>
+
+            <article class="card server-subcard">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">Bac serveur</p>
+                <h2>Plantes placees</h2>
+              </div>
+            </div>
+            <div class="server-list" id="server-plant-list"></div>
+            </article>
+          </div>
+        </div>
+      </details>
+
+      <details class="card advanced-block" id="dev-legacy-block" hidden>
+        <summary class="advanced-summary">
+          <div>
+            <p class="eyebrow">Secours</p>
+            <h2>JSON legacy</h2>
+          </div>
+          <span class="badge">Diagnostic</span>
+        </summary>
+        <div class="advanced-body">
+          <div class="actions wrap advanced-tools-row">
+            <button class="secondary" id="push-local-btn" disabled>Envoyer la sauvegarde locale</button>
+            <button class="ghost" id="create-demo-btn" disabled>Creer une sauvegarde demo</button>
+            <button class="ghost" id="format-json-btn">Formatter</button>
+          </div>
+          <textarea id="save-json" class="json-area" spellcheck="false" placeholder="{ }"></textarea>
+          <p class="note" id="json-status">Ce bloc reste disponible pour diagnostic et secours temporaire.</p>
+        </div>
+      </details>
+    </main>
+
+    <script src="./supabase-config.js"></script>
+    <script src="../content.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

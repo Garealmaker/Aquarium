@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aquariow Legacy</title>
+    <meta
+      name="description"
+      content="Prototype communautaire de jeu d'aquariums virtuels jouable sur navigateur."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <div class="topbar">
+        <div class="topbar-status">
+          <button class="ghost small topbar-session-btn" id="online-logout-btn" hidden>Se deconnecter</button>
+        </div>
+      </div>
+
+      <main class="app-grid">
+        <aside class="status-column">
+          <section class="card status-card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Profil</p>
+                <h2 id="player-name">Gardien des recifs</h2>
+              </div>
+              <button class="ghost" id="rename-btn">Renommer</button>
+            </div>
+            <div class="stat-strip">
+              <article>
+                <span>Coquillages</span>
+                <strong id="coins-value">0</strong>
+              </article>
+              <article>
+                <span>Perles</span>
+                <strong id="pearls-value">0</strong>
+              </article>
+              <article>
+                <span>Niveau</span>
+                <strong id="level-value">1</strong>
+              </article>
+            </div>
+            <div class="progress-block">
+              <div class="progress-header">
+                <span>Progression</span>
+                <strong id="xp-label">0 / 100 XP</strong>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" id="xp-bar"></div>
+              </div>
+            </div>
+            <div class="cycle-card">
+              <div class="market-title">
+                <strong id="cycle-number-value">Cycle 1</strong>
+                <span class="tag" id="cycle-minutes-value">120 / 120 min</span>
+              </div>
+              <p class="panel-note" id="cycle-timer-value">Cycle automatique dans 4 h 00 min</p>
+              <div class="inline-actions">
+                <button class="ghost small" id="daily-reward-btn">Recompense du jour</button>
+                <button class="secondary small" id="advance-cycle-btn">Cycle en cours</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Objectifs</p>
+                <h2>Missions du jour</h2>
+              </div>
+            </div>
+            <div id="mission-list" class="stack-list"></div>
+          </section>
+
+        </aside>
+
+        <section class="main-column">
+          <nav class="tab-bar" aria-label="Navigation">
+            <button class="tab active" data-tab="aquarium">Aquarium</button>
+            <button class="tab" data-tab="shop">Boutique</button>
+          </nav>
+
+          <section class="card tab-panel active" data-panel="aquarium">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Habitat principal</p>
+                <h2 id="aquarium-name">Lagon des lucioles</h2>
+                <p class="panel-note" id="aquarium-capacity-label">0 poisson</p>
+              </div>
+              <div class="inline-actions">
+                <button class="ghost" id="rename-aquarium-btn">Renommer le bac</button>
+                <button class="ghost" id="decorate-btn">Mode plantation</button>
+              </div>
+            </div>
+            <div class="aquarium-switcher" id="aquarium-switcher"></div>
+
+            <div class="tank-tab-bar" aria-label="Infos de l'aquarium">
+              <button class="tank-tab active" data-tank-tab="overview">Apercu</button>
+              <button class="tank-tab" data-tank-tab="fish">Poissons</button>
+              <button class="tank-tab" data-tank-tab="plants">Plantes</button>
+              <button class="tank-tab" data-tank-tab="inventory">Inventaire</button>
+            </div>
+
+            <div class="tank-subpanel active" data-tank-panel="overview">
+              <div class="overview-shell">
+                <div class="overview-visual-column">
+                  <div class="aquarium-stage" id="aquarium-stage">
+                    <div class="water-overlay"></div>
+                    <div class="scene-floor"></div>
+                    <div class="bubble-layer depth-back" id="bubble-back-layer"></div>
+                    <div class="scene-layer depth-back" id="decor-back-layer"></div>
+                    <div class="bubble-layer depth-mid" id="bubble-mid-layer"></div>
+                    <div class="scene-layer depth-mid" id="decor-mid-layer"></div>
+                    <div class="food-layer" id="food-layer"></div>
+                    <div class="fish-layer" id="fish-layer"></div>
+                    <div class="scene-layer depth-front" id="decor-front-layer"></div>
+                    <div class="bubble-layer depth-front" id="bubble-front-layer"></div>
+                    <div class="placement-cursor" id="placement-cursor" hidden></div>
+                    <div class="scene-hint" id="scene-hint">Choisis une plante puis clique dans l'aquarium pour la placer.</div>
+                  </div>
+                  <div class="placement-panel" id="placement-panel">
+                    <div class="placement-heading">
+                      <div>
+                        <p class="eyebrow">Edition botanique</p>
+                        <h3>Placement fixe des plantes</h3>
+                      </div>
+                      <button class="ghost small" id="placement-cancel-btn">Annuler</button>
+                    </div>
+                    <div class="placement-depths" id="placement-depths">
+                      <button class="ghost small" data-depth="1">Avant</button>
+                      <button class="ghost small active" data-depth="2">Milieu</button>
+                    </div>
+                    <div class="placement-list" id="placement-list"></div>
+                  </div>
+                </div>
+
+                <div class="overview-side-column">
+                  <article class="inventory-item overview-panel">
+                    <div class="market-title">
+                      <strong>Gestion du bac</strong>
+                      <span class="tag">Entretien et chimie</span>
+                    </div>
+                    <div class="inline-actions system-actions management-actions">
+                      <button class="primary small" id="feed-all-btn">Nourrir</button>
+                      <button class="secondary small" id="clean-btn">Nettoyer</button>
+                    </div>
+                    <div class="control-stack">
+                      <label class="tank-control" for="temp-slider">
+                        <span>Temperature</span>
+                        <strong id="temp-slider-value">24 C</strong>
+                        <div class="tank-control-range">
+                          <span id="temp-slider-min">20 C</span>
+                          <input type="range" id="temp-slider" min="20" max="30" step="1" value="24" />
+                          <span id="temp-slider-max">30 C</span>
+                        </div>
+                      </label>
+                      <label class="tank-control" for="light-slider">
+                        <span>Luminosite</span>
+                        <strong id="light-slider-value">2 h</strong>
+                        <div class="tank-control-range">
+                          <span id="light-slider-min">0 h</span>
+                          <input type="range" id="light-slider" min="0" max="6" step="1" value="2" />
+                          <span id="light-slider-max">6 h</span>
+                        </div>
+                      </label>
+                    </div>
+                  </article>
+
+                  <article class="inventory-item overview-panel">
+                    <div class="market-title">
+                      <strong>Sante du bac</strong>
+                      <span class="tag" id="tank-state-tag">Stable</span>
+                    </div>
+                    <div class="mini-grid system-mini-grid">
+                      <article>
+                        <span>Qualite d'eau</span>
+                        <strong id="water-value">0%</strong>
+                      </article>
+                      <article>
+                        <span>Confort moyen</span>
+                        <strong id="comfort-value">0%</strong>
+                      </article>
+                      <article>
+                        <span>Temperature</span>
+                        <strong id="temperature-value">24 C</strong>
+                      </article>
+                      <article>
+                        <span>CO2 cons./prod.</span>
+                        <strong id="co2-balance-value">0 / 0</strong>
+                      </article>
+                      <article>
+                        <span>O2 cons./prod.</span>
+                        <strong id="oxygen-balance-value">0 / 0</strong>
+                      </article>
+                      <article>
+                        <span>pH</span>
+                        <strong id="ph-value">7,0</strong>
+                      </article>
+                    </div>
+                  </article>
+                </div>
+              </div>
+            </div>
+
+            <div class="tank-subpanel" data-tank-panel="fish">
+              <div class="section-heading section-heading-spaced">
+                <div>
+                  <p class="eyebrow">Population</p>
+                  <h2>Tes poissons</h2>
+                </div>
+                <button class="ghost" id="breed-btn">Essayer une reproduction</button>
+              </div>
+              <div id="fish-list" class="fish-list"></div>
+            </div>
+
+            <div class="tank-subpanel" data-tank-panel="plants">
+              <div class="section-heading section-heading-spaced">
+                <div>
+                  <p class="eyebrow">Jardin aquatique</p>
+                  <h2>Tes plantes</h2>
+                </div>
+              </div>
+              <div id="plant-list" class="fish-list"></div>
+            </div>
+
+            <div class="tank-subpanel" data-tank-panel="inventory">
+              <div class="section-heading section-heading-spaced">
+                <div>
+                  <p class="eyebrow">Reserve du bac</p>
+                  <h2>Inventaire</h2>
+                </div>
+              </div>
+              <div class="inventory-tab-bar" aria-label="Categories inventaire">
+                <button class="inventory-tab active" data-inventory-tab="fish">Poissons</button>
+                <button class="inventory-tab" data-inventory-tab="plants">Plantes</button>
+                <button class="inventory-tab" data-inventory-tab="utility">Utilitaires</button>
+                <button class="inventory-tab" data-inventory-tab="decor">Decors</button>
+              </div>
+              <div class="inventory-subpanel active" data-inventory-panel="fish">
+                <div id="inventory-fish-list" class="stack-list market-list"></div>
+              </div>
+              <div class="inventory-subpanel" data-inventory-panel="plants">
+                <div id="inventory-plant-list" class="stack-list market-list"></div>
+              </div>
+              <div class="inventory-subpanel" data-inventory-panel="utility">
+                <div id="inventory-utility-list" class="stack-list market-list"></div>
+              </div>
+              <div class="inventory-subpanel" data-inventory-panel="decor">
+                <div id="inventory-decor-list" class="stack-list market-list"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card tab-panel" data-panel="shop">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Boutique marine</p>
+                <h2>Marche et elevage</h2>
+              </div>
+            </div>
+            <div class="shop-tab-bar" aria-label="Categories boutique">
+              <button class="shop-tab active" data-shop-tab="fish">Poissons</button>
+              <button class="shop-tab" data-shop-tab="plants">Plantes</button>
+              <button class="shop-tab" data-shop-tab="utility">Utilitaires</button>
+              <button class="shop-tab" data-shop-tab="decor">Decors</button>
+            </div>
+            <div class="shop-subpanel active" data-shop-panel="fish">
+              <div class="shop-section">
+                <h3>Adopter un poisson</h3>
+                <div id="shop-fish-list" class="stack-list market-list"></div>
+              </div>
+            </div>
+            <div class="shop-subpanel" data-shop-panel="plants">
+              <div class="shop-section">
+                <h3>Plantes</h3>
+                <div id="shop-plant-list" class="stack-list market-list"></div>
+              </div>
+            </div>
+            <div class="shop-subpanel" data-shop-panel="utility">
+              <div class="shop-section">
+                <h3>Utilitaires</h3>
+                <div id="shop-utility-list" class="stack-list market-list"></div>
+              </div>
+            </div>
+            <div class="shop-subpanel" data-shop-panel="decor">
+              <div class="shop-section">
+                <h3>Decors</h3>
+                <div id="shop-decor-list" class="stack-list market-list"></div>
+              </div>
+            </div>
+          </section>
+
+        </section>
+      </main>
+    </div>
+
+    <template id="fish-card-template">
+      <article class="fish-card">
+        <div class="fish-card-top">
+          <div>
+            <p class="fish-species"></p>
+            <h3 class="fish-name"></h3>
+          </div>
+          <button class="ghost small sell-fish-btn">Vendre</button>
+        </div>
+        <div class="fish-meta"></div>
+        <div class="meter-grid"></div>
+      </article>
+    </template>
+
+    <div class="onboarding-overlay" id="onboarding-overlay" hidden>
+      <div class="onboarding-card" id="onboarding-card">
+        <button class="onboarding-close" id="onboarding-close-btn" hidden aria-label="Fermer le tutoriel">×</button>
+        <p class="eyebrow" id="onboarding-progress">Tutoriel</p>
+        <h2 id="onboarding-title">Bienvenue dans Aquariow</h2>
+        <p id="onboarding-text">
+          On va lancer ton premier bac ensemble, pas a pas.
+        </p>
+        <div class="onboarding-actions">
+          <button class="primary" id="onboarding-start-btn">Commencer</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="./content.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
