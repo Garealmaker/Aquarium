@@ -50,7 +50,7 @@ create table if not exists public.aquariums (
   water_quality numeric(5,2) not null default 84,
   temperature_target numeric(5,2) not null default 24,
   light_hours integer not null default 2,
-  co2_level numeric(5,2) not null default 4,
+  co2_level numeric(5,2) not null default 6,
   ph_level numeric(5,2) not null default 7,
   lamp_level integer not null default 1,
   diffuser_level integer not null default 1,
@@ -67,7 +67,7 @@ create table if not exists public.aquariums (
 alter table public.aquariums add column if not exists lamp_level integer not null default 1;
 alter table public.aquariums add column if not exists diffuser_level integer not null default 1;
 alter table public.aquariums add column if not exists last_auto_cycle_at timestamptz not null default now();
-alter table public.aquariums alter column co2_level set default 4;
+alter table public.aquariums alter column co2_level set default 6;
 
 create table if not exists public.fish_species_catalog (
   id text primary key,
@@ -140,6 +140,7 @@ create table if not exists public.owned_fish (
   hunger numeric(5,2) not null default 100,
   vitality_points integer not null default 10,
   good_cycle_streak integer not null default 0,
+  starving_cycle_streak integer not null default 0,
   longevity_cycles_left integer not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -155,6 +156,7 @@ create table if not exists public.owned_plants (
   x_percent numeric(5,2) not null default 50,
   vitality_points integer not null default 10,
   good_cycle_streak integer not null default 0,
+  dark_cycle_streak integer not null default 0,
   growth numeric(6,4) not null default 0,
   longevity_cycles_left integer not null,
   created_at timestamptz not null default now(),
@@ -163,6 +165,8 @@ create table if not exists public.owned_plants (
 
 alter table public.owned_plants add column if not exists x_percent numeric(5,2) not null default 50;
 alter table public.owned_plants add column if not exists growth numeric(6,4) not null default 0;
+alter table public.owned_fish add column if not exists starving_cycle_streak integer not null default 0;
+alter table public.owned_plants add column if not exists dark_cycle_streak integer not null default 0;
 
 create table if not exists public.fry_batches (
   id uuid primary key default gen_random_uuid(),
@@ -315,11 +319,11 @@ insert into public.plant_species_catalog (
   description
 )
 values
-  ('anubias-nana', 'Anubias nana', 42, 22, 28, 6.0, 7.6, 6, 10, 0.3, 0.4, 5, 36, 'Une plante compacte et stable, parfaite pour lancer un aquarium plante sans prise de risque.'),
-  ('microsorum-java', 'Microsorum (fougere de Java)', 54, 22, 28, 6.0, 7.5, 6, 10, 0.4, 0.5, 6, 35, 'Une fougere souple et elegante qui apporte du volume sans trop exiger de CO2.'),
-  ('cryptocoryne-wendtii', 'Cryptocoryne wendtii', 48, 22, 28, 6.2, 7.4, 7, 11, 0.5, 0.6, 6, 34, 'Une plante dense et chaude, ideale pour meubler le milieu du bac avec douceur.'),
-  ('vallisneria-spiralis', 'Vallisneria spiralis', 62, 20, 28, 6.5, 8.0, 8, 12, 0.7, 0.9, 4, 38, 'Une grande rubanee tres vivante qui donne de la hauteur et booste l''oxygene du bac.'),
-  ('echinodorus-bleheri', 'Echinodorus bleheri', 68, 22, 30, 6.5, 7.8, 8, 12, 0.8, 1.0, 7, 37, 'Une grande rosette ample qui structure le bac et offre un excellent rendement en oxygene.')
+  ('anubias-nana', 'Anubias nana', 42, 22, 28, 6.0, 7.6, 6, 10, 0.3, 0.9, 5, 36, 'Une plante compacte et stable, parfaite pour lancer un aquarium plante sans prise de risque.'),
+  ('microsorum-java', 'Microsorum (fougere de Java)', 54, 22, 28, 6.0, 7.5, 6, 10, 0.4, 1.0, 6, 35, 'Une fougere souple et elegante qui apporte du volume sans trop exiger de CO2.'),
+  ('cryptocoryne-wendtii', 'Cryptocoryne wendtii', 48, 22, 28, 6.2, 7.4, 7, 11, 0.5, 1.1, 6, 34, 'Une plante dense et chaude, ideale pour meubler le milieu du bac avec douceur.'),
+  ('vallisneria-spiralis', 'Vallisneria spiralis', 62, 20, 28, 6.5, 8.0, 8, 12, 0.7, 1.4, 4, 38, 'Une grande rubanee tres vivante qui donne de la hauteur et booste l''oxygene du bac.'),
+  ('echinodorus-bleheri', 'Echinodorus bleheri', 68, 22, 30, 6.5, 7.8, 8, 12, 0.8, 1.5, 7, 37, 'Une grande rosette ample qui structure le bac et offre un excellent rendement en oxygene.')
 on conflict (id) do update
 set
   species = excluded.species,
@@ -540,11 +544,11 @@ language sql
 immutable
 as $$
   select case greatest(1, least(coalesce(diffuser_level_value, 1), 5))
-    when 1 then 4
-    when 2 then 6
-    when 3 then 8
-    when 4 then 10
-    else 12
+    when 1 then 6
+    when 2 then 8
+    when 3 then 10
+    when 4 then 12
+    else 14
   end;
 $$;
 
@@ -555,6 +559,12 @@ stable
 as $$
   select to_char(timezone('Europe/Paris', now())::date, 'YYYY-MM-DD');
 $$;
+
+update public.aquariums
+set
+  co2_level = public.get_diffuser_output(diffuser_level),
+  updated_at = now()
+where co2_level <> public.get_diffuser_output(diffuser_level);
 
 create or replace function public.get_week_key_paris()
 returns text
@@ -935,6 +945,7 @@ as $$
                     'hunger', f.hunger,
                     'vitality_points', f.vitality_points,
                     'good_cycle_streak', f.good_cycle_streak,
+                    'starving_cycle_streak', f.starving_cycle_streak,
                     'longevity_cycles_left', f.longevity_cycles_left,
                     'updated_at', f.updated_at
                   )
@@ -961,6 +972,7 @@ as $$
                     'growth', p.growth,
                     'vitality_points', p.vitality_points,
                     'good_cycle_streak', p.good_cycle_streak,
+                    'dark_cycle_streak', p.dark_cycle_streak,
                     'longevity_cycles_left', p.longevity_cycles_left,
                     'updated_at', p.updated_at
                   )
@@ -1063,6 +1075,7 @@ as $$
               'hunger', f.hunger,
               'vitality_points', f.vitality_points,
               'good_cycle_streak', f.good_cycle_streak,
+              'starving_cycle_streak', f.starving_cycle_streak,
               'longevity_cycles_left', f.longevity_cycles_left,
               'updated_at', f.updated_at
             )
@@ -1089,6 +1102,7 @@ as $$
               'growth', p.growth,
               'vitality_points', p.vitality_points,
               'good_cycle_streak', p.good_cycle_streak,
+              'dark_cycle_streak', p.dark_cycle_streak,
               'longevity_cycles_left', p.longevity_cycles_left,
               'updated_at', p.updated_at
             )
@@ -1132,6 +1146,8 @@ declare
   fish_new_vitality integer;
   plant_new_streak integer;
   fish_new_streak integer;
+  plant_dark_cycle_streak integer;
+  fish_starving_cycle_streak integer;
   plant_growth_gain numeric := 0;
   fish_new_hunger numeric;
   condition_ratio numeric;
@@ -1176,6 +1192,7 @@ begin
       p.id,
       p.vitality_points,
       p.good_cycle_streak,
+      p.dark_cycle_streak,
       p.longevity_cycles_left,
       c.temperature_min,
       c.temperature_max,
@@ -1195,6 +1212,7 @@ begin
     light_ok := aquarium_record.light_hours > 0
       and aquarium_record.light_hours between plant_record.light_min and plant_record.light_max;
     co2_ok := co2_coverage >= 1;
+    plant_dark_cycle_streak := case when aquarium_record.light_hours < 1 then plant_record.dark_cycle_streak + 1 else 0 end;
 
     plant_failures :=
       case when temp_ok then 0 else 1 end +
@@ -1212,30 +1230,28 @@ begin
       plant_growth_gain := case when plant_failures = 1 then 0.03 else 0 end;
     end if;
 
+    if plant_dark_cycle_streak >= 2 then
+      plant_new_vitality := 0;
+    end if;
+
     update public.owned_plants
     set
       vitality_points = plant_new_vitality,
       good_cycle_streak = plant_new_streak,
+      dark_cycle_streak = plant_dark_cycle_streak,
       growth = least(1, greatest(0, coalesce(growth, 0) + plant_growth_gain)),
       longevity_cycles_left = greatest(0, plant_record.longevity_cycles_left - 1),
       updated_at = now()
     where id = plant_record.id;
 
-    if aquarium_record.light_hours = 0 then
+    if aquarium_record.light_hours < 1 then
       condition_ratio := 0;
+    elsif temp_ok and ph_ok then
+      condition_ratio := 1;
+    elsif temp_ok or ph_ok then
+      condition_ratio := 0.5;
     else
-      condition_ratio := greatest(
-        0,
-        least(
-          1,
-          (
-            (case when temp_ok then 1 else 0 end) +
-            (case when ph_ok then 1 else 0 end) +
-            (case when light_ok then 1 else 0 end) +
-            co2_coverage
-          ) / 4.0
-        )
-      );
+      condition_ratio := 0.1;
     end if;
 
     oxygen_output := oxygen_output + (plant_record.oxygen_generation * condition_ratio);
@@ -1260,6 +1276,7 @@ begin
       f.hunger,
       f.vitality_points,
       f.good_cycle_streak,
+      f.starving_cycle_streak,
       f.longevity_cycles_left,
       c.temperature_min,
       c.temperature_max,
@@ -1276,6 +1293,7 @@ begin
     ph_ok := aquarium_record.ph_level between fish_record.ph_min and fish_record.ph_max;
     hunger_ok := fish_new_hunger > 0;
     oxygen_ok := oxygen_coverage >= 1;
+    fish_starving_cycle_streak := case when fish_new_hunger <= 0 then fish_record.starving_cycle_streak + 1 else 0 end;
 
     fish_failures :=
       case when temp_ok then 0 else 1 end +
@@ -1291,11 +1309,16 @@ begin
       fish_new_vitality := greatest(0, fish_record.vitality_points - fish_failures);
     end if;
 
+    if fish_starving_cycle_streak >= 2 then
+      fish_new_vitality := 0;
+    end if;
+
     update public.owned_fish
     set
       hunger = fish_new_hunger,
       vitality_points = fish_new_vitality,
       good_cycle_streak = fish_new_streak,
+      starving_cycle_streak = fish_starving_cycle_streak,
       longevity_cycles_left = greatest(0, fish_record.longevity_cycles_left - 1),
       updated_at = now()
     where id = fish_record.id;
@@ -1500,7 +1523,7 @@ begin
       84,
       24,
       2,
-      4,
+      6,
       7,
       1,
       1,
@@ -1529,6 +1552,8 @@ begin
   where user_id = current_user_id
   order by slot_index
   limit 1;
+
+  perform public.spend_user_cycle_minutes(current_user_id, 10);
 
   update public.aquariums
   set
@@ -1716,6 +1741,8 @@ begin
     raise exception 'Perles insuffisantes pour debloquer un nouvel aquarium';
   end if;
 
+  perform public.spend_user_cycle_minutes(current_user_id, 10);
+
   update public.profiles
   set
     pearls = pearls - pearl_cost,
@@ -1746,7 +1773,7 @@ begin
     84,
     24,
     2,
-    4,
+    6,
     7,
     1,
     1,
@@ -1784,7 +1811,7 @@ begin
   end if;
 
   perform public.bootstrap_player_core_state();
-  perform public.ensure_aquarium_minutes(target_aquarium_id, 25);
+  perform public.ensure_aquarium_minutes(target_aquarium_id, 10);
 
   select *
   into aquarium_record
@@ -1809,7 +1836,7 @@ begin
     raise exception 'Il faut au moins deux poissons adultes en bon confort';
   end if;
 
-  perform public.spend_user_cycle_minutes(current_user_id, 25);
+  perform public.spend_user_cycle_minutes(current_user_id, 10);
 
   select coalesce(sum(c.comfort_bonus), 0)
   into support_bonus
@@ -1917,12 +1944,6 @@ begin
         raise exception 'Coquillages insuffisants';
       end if;
 
-      update public.profiles
-      set
-        coins = coins - effective_cost,
-        updated_at = now()
-      where user_id = current_user_id;
-
       if target_aquarium_id is not null then
         select *
         into target_aquarium
@@ -1934,6 +1955,14 @@ begin
           raise exception 'Aquarium introuvable ou non autorise';
         end if;
       end if;
+
+      perform public.spend_user_cycle_minutes(current_user_id, 10);
+
+      update public.profiles
+      set
+        coins = coins - effective_cost,
+        updated_at = now()
+      where user_id = current_user_id;
 
       insert into public.owned_fish (
         user_id,
@@ -1987,6 +2016,8 @@ begin
       if target_profile.coins < effective_cost then
         raise exception 'Coquillages insuffisants';
       end if;
+
+      perform public.spend_user_cycle_minutes(current_user_id, 10);
 
       update public.profiles
       set
@@ -2076,6 +2107,8 @@ begin
       if target_profile.coins < effective_cost then
         raise exception 'Coquillages insuffisants';
       end if;
+
+      perform public.spend_user_cycle_minutes(current_user_id, 10);
 
       update public.profiles
       set
@@ -2180,7 +2213,7 @@ begin
   end if;
 
   perform public.bootstrap_player_core_state();
-  perform public.ensure_aquarium_minutes(target_aquarium_id, 5);
+  perform public.ensure_aquarium_minutes(target_aquarium_id, 10);
 
   select *
   into aquarium_record
@@ -2225,7 +2258,7 @@ begin
       where user_id = current_user_id
         and aquarium_id = target_aquarium_id;
 
-      perform public.spend_user_cycle_minutes(current_user_id, 5);
+      perform public.spend_user_cycle_minutes(current_user_id, 10);
 
       update public.aquariums
       set
@@ -2238,7 +2271,7 @@ begin
       perform public.append_community_feed_entry(current_user_id, 'Toi', 'vient de nourrir tout son aquarium.', target_aquarium_id);
 
     when 'water' then
-      perform public.spend_user_cycle_minutes(current_user_id, 5);
+      perform public.spend_user_cycle_minutes(current_user_id, 10);
 
       update public.aquariums
       set
@@ -2249,7 +2282,7 @@ begin
       perform public.append_journal_log_entry(current_user_id, 'Le changement d''eau a stabilise le bac.', target_aquarium_id);
 
     when 'ph-up' then
-      perform public.spend_user_cycle_minutes(current_user_id, 5);
+      perform public.spend_user_cycle_minutes(current_user_id, 10);
       if not coalesce(target_profile.onboarding_completed, false)
          and coalesce(target_profile.onboarding_step, 0) = 11 then
         update public.aquariums
@@ -2270,7 +2303,7 @@ begin
 
     when 'ph-down' then
       delta := 0.6 + random() * 0.2;
-      perform public.spend_user_cycle_minutes(current_user_id, 5);
+      perform public.spend_user_cycle_minutes(current_user_id, 10);
 
       update public.aquariums
       set
@@ -2314,8 +2347,8 @@ begin
   end if;
 
   perform public.bootstrap_player_core_state();
-  perform public.ensure_aquarium_minutes(target_aquarium_id, 5);
-  perform public.spend_user_cycle_minutes(current_user_id, 5);
+  perform public.ensure_aquarium_minutes(target_aquarium_id, 10);
+  perform public.spend_user_cycle_minutes(current_user_id, 10);
 
   update public.aquariums
   set
@@ -2349,7 +2382,7 @@ begin
   end if;
 
   perform public.bootstrap_player_core_state();
-  perform public.ensure_aquarium_minutes(target_aquarium_id, 5);
+  perform public.ensure_aquarium_minutes(target_aquarium_id, 10);
 
   select *
   into aquarium_record
@@ -2370,7 +2403,7 @@ begin
         return public.get_player_core_state_by_user(current_user_id);
       end if;
 
-      perform public.spend_user_cycle_minutes(current_user_id, 5);
+      perform public.spend_user_cycle_minutes(current_user_id, 10);
 
       update public.aquariums
       set
@@ -2391,7 +2424,7 @@ begin
         return public.get_player_core_state_by_user(current_user_id);
       end if;
 
-      perform public.spend_user_cycle_minutes(current_user_id, 5);
+      perform public.spend_user_cycle_minutes(current_user_id, 10);
 
       update public.aquariums
       set
@@ -2447,8 +2480,8 @@ begin
   end if;
 
   if effective_aquarium_id is not null then
-    perform public.ensure_aquarium_minutes(effective_aquarium_id, 5);
-    perform public.spend_user_cycle_minutes(current_user_id, 5);
+    perform public.ensure_aquarium_minutes(effective_aquarium_id, 10);
+    perform public.spend_user_cycle_minutes(current_user_id, 10);
   end if;
 
   if fish_record.aquarium_id is null then
@@ -2740,8 +2773,8 @@ begin
       raise exception 'Choisis un aquarium pour planter cet element';
     end if;
 
-    perform public.ensure_aquarium_minutes(target_aquarium_id, 5);
-    perform public.spend_user_cycle_minutes(current_user_id, 5);
+    perform public.ensure_aquarium_minutes(target_aquarium_id, 10);
+    perform public.spend_user_cycle_minutes(current_user_id, 10);
 
     select *
     into aquarium_record
@@ -2767,8 +2800,8 @@ begin
     perform public.append_community_feed_entry(current_user_id, 'Toi', 'vient de planter ' || coalesce(plant_record.nickname, 'une plante') || ' dans l''aquarium principal.', target_aquarium_id);
 
   elsif target_aquarium_id is not null and target_aquarium_id <> plant_record.aquarium_id then
-    perform public.ensure_aquarium_minutes(target_aquarium_id, 5);
-    perform public.spend_user_cycle_minutes(current_user_id, 5);
+    perform public.ensure_aquarium_minutes(target_aquarium_id, 10);
+    perform public.spend_user_cycle_minutes(current_user_id, 10);
 
     select *
     into aquarium_record
@@ -2792,8 +2825,8 @@ begin
     perform public.append_journal_log_entry(current_user_id, plant_record.nickname || ' change de bassin.', target_aquarium_id);
 
   elsif target_aquarium_id is not null and target_aquarium_id = plant_record.aquarium_id then
-    perform public.ensure_aquarium_minutes(target_aquarium_id, 5);
-    perform public.spend_user_cycle_minutes(current_user_id, 5);
+    perform public.ensure_aquarium_minutes(target_aquarium_id, 10);
+    perform public.spend_user_cycle_minutes(current_user_id, 10);
 
     update public.owned_plants
     set
@@ -2805,8 +2838,8 @@ begin
     perform public.append_journal_log_entry(current_user_id, plant_record.nickname || ' a ete deplacee dans le bac.', target_aquarium_id);
 
   else
-    perform public.ensure_aquarium_minutes(plant_record.aquarium_id, 5);
-    perform public.spend_user_cycle_minutes(current_user_id, 5);
+    perform public.ensure_aquarium_minutes(plant_record.aquarium_id, 10);
+    perform public.spend_user_cycle_minutes(current_user_id, 10);
 
     update public.owned_plants
     set
@@ -3137,8 +3170,8 @@ begin
   end if;
 
   perform public.bootstrap_player_core_state();
-  perform public.ensure_aquarium_minutes(target_aquarium_id, 40);
-  perform public.spend_user_cycle_minutes(current_user_id, 40);
+  perform public.ensure_aquarium_minutes(target_aquarium_id, 10);
+  perform public.spend_user_cycle_minutes(current_user_id, 10);
 
   select *
   into target_profile
@@ -3237,8 +3270,8 @@ begin
   end if;
 
   perform public.bootstrap_player_core_state();
-  perform public.ensure_aquarium_minutes(target_aquarium_id, 20);
-  perform public.spend_user_cycle_minutes(current_user_id, 20);
+  perform public.ensure_aquarium_minutes(target_aquarium_id, 10);
+  perform public.spend_user_cycle_minutes(current_user_id, 10);
 
   select *
   into target_profile

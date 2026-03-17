@@ -832,6 +832,7 @@ button:disabled {
 }
 
 .plant-stem,
+.plant-tip,
 .plant-root {
   position: absolute;
   inset: 0;
@@ -848,17 +849,26 @@ button:disabled {
 }
 
 .plant-stem {
-  transform-origin: 50% 100%;
   clip-path: polygon(
     0 0,
     100% 0,
     100% calc(100% - var(--plant-root-cut, 20%) + 1.5%),
     0 calc(100% - var(--plant-root-cut, 20%) + 1.5%)
   );
-  animation: plant-sway var(--plant-sway-duration, 6s) ease-in-out infinite;
-  animation-delay: var(--plant-delay, 0s);
-  will-change: transform;
   z-index: 1;
+}
+
+.plant-tip {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - var(--plant-root-cut, 20%) - 16%),
+    0 calc(100% - var(--plant-root-cut, 20%) - 16%)
+  );
+  transform-origin: 50% calc(100% - var(--plant-root-cut, 20%) - 8%);
+  animation: plant-sway var(--plant-sway-duration, 6.8s) ease-in-out infinite;
+  will-change: transform;
+  z-index: 2;
 }
 
 .plant-root {
@@ -868,7 +878,7 @@ button:disabled {
     100% 100%,
     0 100%
   );
-  z-index: 2;
+  z-index: 3;
 }
 
 .decor-piece::before,
@@ -1320,6 +1330,32 @@ button:disabled {
   margin-top: 6px;
 }
 
+.upgrade-rack {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.upgrade-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(123, 224, 192, 0.16);
+  background: rgba(7, 33, 55, 0.54);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.upgrade-card .market-title strong:last-child {
+  font-size: 0.95rem;
+  color: var(--text-main);
+}
+
+.upgrade-card .secondary {
+  justify-self: start;
+}
+
 .tank-control {
   display: grid;
   grid-template-columns: 110px minmax(0, 1fr);
@@ -1646,6 +1682,7 @@ button:disabled {
   .hero,
   .app-grid,
   .system-grid,
+  .upgrade-rack,
   .community-competition-board,
   .community-grid,
   .shop-grid,

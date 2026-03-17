@@ -65,21 +65,21 @@ const HIDDEN_VITALITY_POINTS = 10;
 const HIDDEN_VITALITY_STEP = 100 / HIDDEN_VITALITY_POINTS;
 const HIDDEN_VITALITY_RECOVERY_PER_HOUR = 100 / (CYCLE_STEP_HOURS * 2);
 const CYCLE_COSTS = {
-  cleanLight: 16,
-  cleanDeep: 24,
-  oxygenate: 6,
-  temperatureStep: 5,
-  lightStep: 5,
-  co2Step: 5,
-  phStep: 5,
-  serviceFilter: 14,
-  upgradeFilter: 20,
+  cleanLight: 10,
+  cleanDeep: 10,
+  oxygenate: 10,
+  temperatureStep: 10,
+  lightStep: 10,
+  co2Step: 10,
+  phStep: 10,
+  serviceFilter: 10,
+  upgradeFilter: 10,
   placePlant: 10,
-  movePlant: 5,
+  movePlant: 10,
   returnPlant: 10,
-  breedAttempt: 25,
-  speedCompetition: 40,
-  reflexCompetition: 20,
+  breedAttempt: 10,
+  speedCompetition: 10,
+  reflexCompetition: 10,
   beautyContest: 10,
 };
 const DEFAULT_AQUARIUM_STATS = {
@@ -89,7 +89,7 @@ const DEFAULT_AQUARIUM_STATS = {
   temperatureTarget: 24,
   lightHours: 2,
   lampLevel: 1,
-  co2Level: 2,
+  co2Level: 6,
   co2DeviceLevel: 1,
   phLevel: 7,
   oxygenLevel: 76,
@@ -138,6 +138,7 @@ const els = {
   bubbleMidLayer: document.getElementById("bubble-mid-layer"),
   bubbleFrontLayer: document.getElementById("bubble-front-layer"),
   placementPanel: document.getElementById("placement-panel"),
+  aquariumUpgradeList: document.getElementById("aquarium-upgrade-list"),
   placementList: document.getElementById("placement-list"),
   placementDepths: Array.from(document.querySelectorAll("[data-depth]")),
   placementCursor: document.getElementById("placement-cursor"),
@@ -258,9 +259,9 @@ function getOnboardingDefinition(step = getOnboardingState().step) {
     1: {
       progress: "Etape 1 / 10",
       title: "Ameliore le diffuseur CO2",
-      text: "Ouvre Boutique > Utilitaires et achete le Diffuseur CO2 II. Cet achat est offert pour ton tutoriel.",
-      tab: "shop",
-      shopTab: "utility",
+      text: "Sous l'aquarium, ameliore le Diffuseur CO2 jusqu'au niveau II. Cet achat est offert pour ton tutoriel.",
+      tab: "aquarium",
+      tankTab: "overview",
     },
     2: {
       progress: "Etape 2 / 11",
@@ -599,6 +600,10 @@ function applyServerCoreState(coreState) {
         hunger: numericOr(serverFish.hunger, existing?.hunger ?? 82),
         vitality: clamp(numericOr(serverFish.vitality_points, 10) * HIDDEN_VITALITY_STEP, 0, 100),
         goodCycleStreak: Math.max(0, Math.round(numericOr(serverFish.good_cycle_streak, existing?.goodCycleStreak ?? 0))),
+        starvingCycleStreak: Math.max(
+          0,
+          Math.round(numericOr(serverFish.starving_cycle_streak, existing?.starvingCycleStreak ?? 0))
+        ),
         longevity: getServerLongevityPercent(
           serverFish.longevity_cycles_left,
           getFishLifespanCycles({ speciesId: serverFish.species_id })
@@ -624,6 +629,7 @@ function applyServerCoreState(coreState) {
         depth,
         vitality: clamp(numericOr(serverPlant.vitality_points, 10) * HIDDEN_VITALITY_STEP, 0, 100),
         goodCycleStreak: Math.max(0, Math.round(numericOr(serverPlant.good_cycle_streak, existing?.goodCycleStreak ?? 0))),
+        darkCycleStreak: Math.max(0, Math.round(numericOr(serverPlant.dark_cycle_streak, existing?.darkCycleStreak ?? 0))),
         growth: clamp(numericOr(serverPlant.growth, existing?.growth ?? 0), 0, 1),
         longevity: getServerLongevityPercent(
           serverPlant.longevity_cycles_left,
@@ -657,7 +663,7 @@ function applyServerCoreState(coreState) {
         temperatureTarget: numericOr(serverAquarium.temperature_target, 24),
         lightHours: Math.round(numericOr(serverAquarium.light_hours, 2)),
         lampLevel: Math.round(numericOr(serverAquarium.lamp_level, 1)),
-        co2Level: numericOr(serverAquarium.co2_level, 4),
+        co2Level: numericOr(serverAquarium.co2_level, 6),
         co2DeviceLevel: Math.round(numericOr(serverAquarium.diffuser_level, 1)),
         phLevel: numericOr(serverAquarium.ph_level, 7),
         filterLevel: Math.round(numericOr(serverAquarium.filter_level, 1)),
@@ -885,6 +891,7 @@ function createFish(speciesId, overrides = {}) {
     comfort: overrides.comfort ?? 72,
     vitality: overrides.vitality ?? 100,
     goodCycleStreak: Math.max(0, Math.round(numericOr(overrides.goodCycleStreak, 0))),
+    starvingCycleStreak: Math.max(0, Math.round(numericOr(overrides.starvingCycleStreak, 0))),
     newcomerHours: overrides.newcomerHours ?? 18,
     badConditionHours: overrides.badConditionHours ?? 0,
     growth: overrides.growth ?? 0,
@@ -907,6 +914,7 @@ function createPlacedPlant(speciesId, x, y, depth = DEPTH_MID) {
     depth: placementDepth,
     vitality: 100,
     goodCycleStreak: 0,
+    darkCycleStreak: 0,
     growth: 0,
     longevity: 100,
     badConditionHours: 0,
@@ -962,6 +970,7 @@ function normalizePlacedPlants(raw, sourceVersion = SAVE_SCHEMA_VERSION) {
         y: getPlantSoilY(placementDepth),
         vitality: clamp(numericOr(entry.vitality, 100), 0, 100),
         goodCycleStreak: Math.max(0, Math.round(numericOr(entry.goodCycleStreak, 0))),
+        darkCycleStreak: Math.max(0, Math.round(numericOr(entry.darkCycleStreak, 0))),
         growth: clamp(numericOr(entry.growth, 0), 0, 1),
         longevity: clamp(numericOr(entry.longevity, 100), 0, 100),
         badConditionHours: Math.max(numericOr(entry.badConditionHours, 0), 0),
@@ -995,12 +1004,13 @@ function normalizeFishState(raw) {
           numericOr(
             entry.comfort,
             entry.stress !== undefined && entry.stress !== null ? 100 - numericOr(entry.stress, 18) : 72
+          ),
+          0,
+          100
         ),
-        0,
-        100
-      ),
-      vitality: clamp(numericOr(entry.vitality, 100), 0, 100),
+        vitality: clamp(numericOr(entry.vitality, 100), 0, 100),
         goodCycleStreak: Math.max(0, Math.round(numericOr(entry.goodCycleStreak, 0))),
+        starvingCycleStreak: Math.max(0, Math.round(numericOr(entry.starvingCycleStreak, 0))),
         newcomerHours: Math.max(numericOr(entry.newcomerHours, 0), 0),
         badConditionHours: Math.max(numericOr(entry.badConditionHours, 0), 0),
         growth: clamp(numericOr(entry.growth, 0), 0, 1),
@@ -1025,7 +1035,7 @@ function normalizeAquariumStats(raw = {}) {
     temperatureTarget: clamp(numericOr(raw.temperatureTarget, numericOr(raw.temperature, 24)), 20, 30),
     lightHours: clamp(numericOr(raw.lightHours, 2), 0, getLampMaxHours(lampLevel)),
     lampLevel,
-    co2Level: clamp(numericOr(raw.co2Level, 2), 0, getCo2MaxLevel(co2DeviceLevel)),
+    co2Level: clamp(numericOr(raw.co2Level, 6), 0, getCo2MaxLevel(co2DeviceLevel)),
     co2DeviceLevel,
     phLevel: clamp(numericOr(raw.phLevel, 7), 5.5, 8.5),
     oxygenLevel: clamp(numericOr(raw.oxygenLevel, 76), 0, 100),
@@ -1593,19 +1603,24 @@ function applyPlantSpriteNode(node, plantOrSpecies, scaleFactor = 1) {
   const { sprite, displayHeight, displayWidth } = getPlantRenderMetrics(plantOrSpecies, scaleFactor);
 
   node.className = `plant-piece species-${species.id}`;
-  if (node.childElementCount !== 2) {
-    node.innerHTML = '<img class="plant-stem" alt="" aria-hidden="true" draggable="false"><img class="plant-root" alt="" aria-hidden="true" draggable="false">';
+  if (node.childElementCount !== 3) {
+    node.innerHTML =
+      '<img class="plant-stem" alt="" aria-hidden="true" draggable="false"><img class="plant-tip" alt="" aria-hidden="true" draggable="false"><img class="plant-root" alt="" aria-hidden="true" draggable="false">';
   }
   const stemNode = node.querySelector(".plant-stem");
+  const tipNode = node.querySelector(".plant-tip");
   const rootNode = node.querySelector(".plant-root");
   node.style.width = `${displayWidth.toFixed(2)}px`;
   node.style.height = `${displayHeight.toFixed(2)}px`;
   node.style.setProperty("--plant-root-cut", `${sprite.rootCut.toFixed(2)}%`);
-  node.style.setProperty("--plant-sway-angle", `${sprite.swayAngle.toFixed(2)}deg`);
-  node.style.setProperty("--plant-sway-angle-neg", `${(-sprite.swayAngle).toFixed(2)}deg`);
-  node.style.setProperty("--plant-sway-duration", `${sprite.swayDuration.toFixed(2)}s`);
+  node.style.setProperty("--plant-sway-angle", `${(sprite.swayAngle * 0.52).toFixed(2)}deg`);
+  node.style.setProperty("--plant-sway-angle-neg", `${(-sprite.swayAngle * 0.52).toFixed(2)}deg`);
+  node.style.setProperty("--plant-sway-duration", `6.8s`);
   if (stemNode) {
     stemNode.src = sprite.file;
+  }
+  if (tipNode) {
+    tipNode.src = sprite.file;
   }
   if (rootNode) {
     rootNode.src = sprite.file;
@@ -1940,7 +1955,7 @@ function getLampMaxHours(level = state.aquarium?.lampLevel || 1) {
 }
 
 function getCo2MaxLevel(level = state.aquarium?.co2DeviceLevel || 1) {
-  return [0, 4, 6, 8, 10, 12][clamp(level, 1, 5)] || 4;
+  return [0, 6, 8, 10, 12, 14][clamp(level, 1, 5)] || 6;
 }
 
 function getAverageIdealPh(fishes = getActiveFish()) {
@@ -2063,10 +2078,23 @@ function getPlantConditionScore(plant, aquarium = state.aquarium, plants = state
 }
 
 function getPlantOxygenOutputFactor(plant, aquarium = state.aquarium, plants = state.plantsPlaced) {
-  if (numericOr(aquarium.lightHours, 0) <= 0) {
+  const species = getPlantSpecies(plant.speciesId);
+  const lightHours = numericOr(aquarium.lightHours, 0);
+  if (lightHours < 1) {
     return 0;
   }
-  return clamp(getPlantConditionScore(plant, aquarium, plants) * (numericOr(plant.vitality, 100) / 100), 0, 1);
+  const waterTemperature = numericOr(aquarium.temperature, aquarium.temperatureTarget);
+  const tempOk =
+    waterTemperature >= numericOr(species.temperatureMin, 22) &&
+    waterTemperature <= numericOr(species.temperatureMax, 28);
+  const phOk = getPlantPhMismatch(plant, aquarium) <= 0.15;
+  if (tempOk && phOk) {
+    return 1;
+  }
+  if (tempOk || phOk) {
+    return 0.5;
+  }
+  return 0.1;
 }
 
 function getFishOxygenCoverage(fish, aquarium = state.aquarium, fishes = getActiveFish(), plants = state.plantsPlaced) {
@@ -2088,7 +2116,7 @@ function getFishOxygenDeficit(fish, aquarium = state.aquarium, fishes = getActiv
 }
 
 function canPlantPhotosynthesize(plant, aquarium = state.aquarium, plants = state.plantsPlaced) {
-  return getPlantOxygenOutputFactor(plant, aquarium, plants) >= 0.2;
+  return getPlantOxygenOutputFactor(plant, aquarium, plants) > 0;
 }
 
 function getLocalDateKey(date = new Date()) {
@@ -2207,17 +2235,22 @@ function applyCycleToBundle(bundle, reason = "manual") {
 
   plantsPlaced = plantsPlaced.map((plant) => {
     const missingConditions = getPlantMissingConditionCount(plant, aquarium, plantsPlaced);
+    const darkCycleStreak = numericOr(aquarium.lightHours, 0) < 1 ? numericOr(plant.darkCycleStreak, 0) + 1 : 0;
     const nextGoodCycleStreak = missingConditions === 0 ? numericOr(plant.goodCycleStreak, 0) + 1 : 0;
     const healthy = missingConditions === 0;
     const growthGain = healthy ? 0.09 : missingConditions === 1 ? 0.03 : 0;
-    const vitality =
+    let vitality =
       nextGoodCycleStreak >= 2
         ? 100
         : clamp(plant.vitality - missingConditions * HIDDEN_VITALITY_STEP, 0, 100);
+    if (darkCycleStreak >= 2) {
+      vitality = 0;
+    }
     return {
       ...plant,
       vitality,
       goodCycleStreak: nextGoodCycleStreak,
+      darkCycleStreak,
       growth: clamp(numericOr(plant.growth, 0) + growthGain, 0, 1),
       longevity: clamp(plant.longevity - 100 / getPlantLifespanCycles(plant), 0, 100),
       badConditionHours: missingConditions === 0 ? 0 : plant.badConditionHours + CYCLE_STEP_HOURS,
@@ -2227,18 +2260,23 @@ function applyCycleToBundle(bundle, reason = "manual") {
   fish = fish.map((entry) => {
     const nextHunger = clamp(entry.hunger - hungerDrop, 0, 100);
     const missingConditions = getFishMissingConditionCount(entry, aquarium, fish, plantsPlaced, nextHunger);
+    const starvingCycleStreak = nextHunger <= 0 ? numericOr(entry.starvingCycleStreak, 0) + 1 : 0;
     const nextGoodCycleStreak = missingConditions === 0 ? numericOr(entry.goodCycleStreak, 0) + 1 : 0;
     const healthy = missingConditions === 0;
     const growthGain = healthy && nextHunger > 16 ? 0.03 : healthy ? 0.012 : 0.002;
-    const vitality =
+    let vitality =
       nextGoodCycleStreak >= 2
         ? 100
         : clamp(entry.vitality - missingConditions * HIDDEN_VITALITY_STEP, 0, 100);
+    if (starvingCycleStreak >= 2) {
+      vitality = 0;
+    }
     const longevityPenalty = healthy ? 0 : 1.6 + Math.max(0, 50 - entry.comfort) * 0.035;
     return {
       ...entry,
       ageHours: entry.ageHours + CYCLE_STEP_HOURS,
       goodCycleStreak: nextGoodCycleStreak,
+      starvingCycleStreak,
       newcomerHours: Math.max(entry.newcomerHours - CYCLE_STEP_HOURS, 0),
       badConditionHours: healthy ? 0 : entry.badConditionHours + CYCLE_STEP_HOURS,
       hunger: nextHunger,
@@ -2637,19 +2675,96 @@ function getFilterProgressSummary(level = state.aquarium.filterLevel) {
   return `Actuel: reduction de ${currentMax}%. Prochain palier: ${Math.round(getFilterEfficiencyByLevel(nextLevel) * 100)}%.`;
 }
 
+function getNextEquipmentUpgradeItem(type) {
+  const currentLevel =
+    type === "lamp"
+      ? numericOr(state.aquarium.lampLevel, 1)
+      : type === "co2"
+        ? numericOr(state.aquarium.co2DeviceLevel, 1)
+        : numericOr(state.aquarium.filterLevel, 1);
+  return SHOP_ITEMS.find((item) => item.type === type && numericOr(item.level, 1) === currentLevel + 1) || null;
+}
+
+function renderAquariumUpgrades() {
+  if (!els.aquariumUpgradeList) {
+    return;
+  }
+
+  const onlineBlocked = isOnlineAuthoritativeMode() && !isOnlineCoreReady();
+  const upgradeCards = [
+    {
+      type: "lamp",
+      label: "Lampe",
+      level: numericOr(state.aquarium.lampLevel, 1),
+      benefit: `0 a ${getLampMaxHours()} h`,
+      note: getLampProgressSummary(),
+      nextItem: getNextEquipmentUpgradeItem("lamp"),
+    },
+    {
+      type: "co2",
+      label: "Diffuseur CO2",
+      level: numericOr(state.aquarium.co2DeviceLevel, 1),
+      benefit: `Production max ${getCo2MaxLevel()}`,
+      note: getCo2ProgressSummary(),
+      nextItem: getNextEquipmentUpgradeItem("co2"),
+    },
+    {
+      type: "filter",
+      label: "Filtre",
+      level: numericOr(state.aquarium.filterLevel, 1),
+      benefit: `Reduction ${Math.round(getFilterEfficiency() * 100)}%`,
+      note: getFilterProgressSummary(),
+      nextItem: getNextEquipmentUpgradeItem("filter"),
+    },
+  ];
+
+  els.aquariumUpgradeList.innerHTML = upgradeCards
+    .map((entry) => {
+      const isMax = !entry.nextItem;
+      return `
+        <article class="upgrade-card">
+          <div class="market-title">
+            <div>
+              <strong>${entry.label}</strong>
+              <div class="tag">Niveau ${entry.level}</div>
+            </div>
+            <strong>${entry.benefit}</strong>
+          </div>
+          <p class="market-description">${entry.note}</p>
+          <button
+            class="secondary small"
+            data-upgrade-type="${entry.type}"
+            ${isMax || onlineBlocked ? "disabled" : ""}
+          >
+            ${isMax ? "Niveau max" : `Ameliorer (${entry.nextItem.cost} c)`}
+          </button>
+        </article>
+      `;
+    })
+    .join("");
+
+  els.aquariumUpgradeList.querySelectorAll("[data-upgrade-type]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const nextItem = getNextEquipmentUpgradeItem(button.dataset.upgradeType);
+      if (!nextItem) {
+        return;
+      }
+      await buyItem(nextItem.id);
+    });
+  });
+}
+
 function getCycleForecast(aquarium = state.aquarium, fishes = state.fish, plants = state.plantsPlaced, fryBatches = state.fryBatches) {
   const feedUses = Math.max(0, Math.round(numericOr(aquarium.feedUsesThisCycle, 0)));
   const filterReduction = getFilterEfficiencyByLevel(aquarium.filterLevel || 1);
   const waterMinDrop = (5 + feedUses) * (1 - filterReduction);
   const waterMaxDrop = (11 + feedUses) * (1 - filterReduction);
-  const projectedWaterFloor = clamp(aquarium.waterQuality - waterMaxDrop, 0, 100);
   const fishAtRisk = fishes.filter((fish) => {
     const species = getSpecies(fish.speciesId);
     const oxygenCoverage = getFishOxygenCoverage(fish, aquarium, fishes, plants);
     return (
       fish.hunger <= 20 ||
       oxygenCoverage < 0.98 ||
-      projectedWaterFloor < 55 ||
       aquarium.temperature < species.temperatureMin ||
       aquarium.temperature > species.temperatureMax ||
       getFishPhPenalty(fish, aquarium) > 0.15 ||
@@ -2687,9 +2802,6 @@ function getFishMissingConditionCount(fish, aquarium, fishes, plants, nextHunger
   if (aquarium.temperature < species.temperatureMin || aquarium.temperature > species.temperatureMax) {
     missingConditions += 1;
   }
-  if (aquarium.waterQuality < 55) {
-    missingConditions += 1;
-  }
   if (getFishPhPenalty(fish, aquarium) > 0.15) {
     missingConditions += 1;
   }
@@ -2706,9 +2818,6 @@ function getPlantMissingConditionCount(plant, aquarium, plants) {
     missingConditions += 1;
   }
   if (aquarium.temperature < species.temperatureMin || aquarium.temperature > species.temperatureMax) {
-    missingConditions += 1;
-  }
-  if (aquarium.waterQuality < 38) {
     missingConditions += 1;
   }
   if (getPlantPhMismatch(plant, aquarium) > 0.15) {
@@ -3037,6 +3146,7 @@ function render() {
   renderFishCards();
   renderPlantCards();
   renderAquariumVisuals();
+  renderAquariumUpgrades();
   renderPlacementPanel();
   renderTankTabs();
   renderInventoryTabs();
@@ -3266,21 +3376,6 @@ function renderInventoryPanels() {
       actionId: "down",
       actionLabel: "Utiliser",
       disabled: state.inventory.phDownTablets <= 0 || state.aquarium.phLevel <= 5.5,
-    },
-    {
-      label: "Lampe",
-      value: `Niv. ${state.aquarium.lampLevel} - 0 a ${getLampMaxHours()} h`,
-      note: getLampProgressSummary(),
-    },
-    {
-      label: "Diffuseur CO2",
-      value: `Niv. ${state.aquarium.co2DeviceLevel} - prod. max ${getCo2MaxLevel()}`,
-      note: getCo2ProgressSummary(),
-    },
-    {
-      label: "Filtre",
-      value: `Niv. ${state.aquarium.filterLevel} - reduit ${Math.round(getFilterEfficiency() * 100)}%`,
-      note: getFilterProgressSummary(),
     },
   ];
   els.inventoryUtilityList.innerHTML = utilityItems
@@ -3661,8 +3756,6 @@ function syncDecorNodes() {
     const brightness = depthBrightness(placement.depth);
     const floorOffset = getPlantFloorOffset(placement, placement.depth);
     applyPlantSpriteNode(node, placement);
-    node.style.setProperty("--plant-delay", `${placement.index * -0.42}s`);
-
     node.style.left = `${placement.x}%`;
     node.style.bottom = `calc(${(100 - getPlantSoilY(placement.depth)).toFixed(2)}% - ${floorOffset.toFixed(2)}px)`;
     node.style.opacity = "1";
@@ -3752,7 +3845,9 @@ function renderShop() {
   ).join("");
 
   const plantItems = SHOP_ITEMS.filter((item) => item.type === "plant");
-  const utilityItems = SHOP_ITEMS.filter((item) => item.type !== "plant" && item.type !== "water");
+  const utilityItems = SHOP_ITEMS.filter(
+    (item) => !["plant", "water", "lamp", "co2", "filter"].includes(item.type)
+  );
 
   const renderShopItemCard = (item) => {
     const plant = item.type === "plant" ? getPlantSpecies(item.plantType) : null;
@@ -3760,20 +3855,11 @@ function renderShop() {
     const metaLabel =
       item.type === "plant" && plant
         ? `${item.tier} - ${getPlantNeedSummary(plant)}`
-        : item.type === "lamp"
-          ? `${item.tier} - niveau ${item.level} - 0 a ${getLampMaxHours(item.level)} h`
-          : item.type === "co2"
-            ? `${item.tier} - niveau ${item.level} - prod. max ${getCo2MaxLevel(item.level)}`
-            : item.type === "filter"
-              ? `${item.tier} - niveau ${item.level} - reduit ${Math.round(getFilterEfficiencyByLevel(item.level) * 100)}%`
-            : item.type === "ph-up" || item.type === "ph-down"
-              ? `${item.tier} - ${item.amount} pastilles`
-              : `${item.tier} - pack`;
+        : item.type === "ph-up" || item.type === "ph-down"
+          ? `${item.tier} - ${item.amount} pastilles`
+          : `${item.tier} - pack`;
     const ownedCount = item.type === "plant" ? getOwnedPlantCount(item.plantType) : 0;
-    const disabled =
-      (item.type === "lamp" && numericOr(state.aquarium.lampLevel, 1) >= numericOr(item.level, 1)) ||
-      (item.type === "co2" && numericOr(state.aquarium.co2DeviceLevel, 1) >= numericOr(item.level, 1)) ||
-      (item.type === "filter" && numericOr(state.aquarium.filterLevel, 1) >= numericOr(item.level, 1));
+    const disabled = false;
 
     return `
       <article class="market-card">
@@ -4634,7 +4720,7 @@ async function feedAllFish() {
   }
 
   const portionsUsed = Math.min(Math.max(1, activeFish.length), state.inventory.food);
-  if (!spendCycleMinutes(Math.max(5, portionsUsed * 5), "le nourrissage")) {
+  if (!spendCycleMinutes(10, "le nourrissage")) {
     return;
   }
   const averageHunger = activeFish.reduce((sum, fish) => sum + fish.hunger, 0) / activeFish.length;
@@ -5003,6 +5089,10 @@ async function buyFish(speciesId) {
     return;
   }
 
+  if (!spendCycleMinutes(10, "l'adoption d'un poisson")) {
+    return;
+  }
+
   state.coins -= species.cost;
   const newcomer = createFish(speciesId);
   state.fish.push(newcomer);
@@ -5023,11 +5113,15 @@ async function buyItem(itemId) {
   if (!item) {
     return;
   }
+  const successMessage =
+    item.type === "lamp" || item.type === "co2" || item.type === "filter"
+      ? `${item.name} installe sur l'aquarium.`
+      : `${item.name} ajoute a ton inventaire.`;
 
   if (
     await runServerBridgeAction(
       (bridge) => bridge.buyItem(itemId, state.selectedAquariumId),
-      `${item.name} ajoute a ton inventaire.`
+      successMessage
     )
   ) {
     if (runtime.lastServerActionSucceeded) {
@@ -5039,6 +5133,10 @@ async function buyItem(itemId) {
   const effectiveCost = isOnboardingShopItemFree(item) ? 0 : item.cost;
   if (state.coins < effectiveCost) {
     toast("Il te manque des coquillages pour cet achat.");
+    return;
+  }
+
+  if (!spendCycleMinutes(10, "l'achat en boutique")) {
     return;
   }
 
@@ -5073,7 +5171,7 @@ async function buyItem(itemId) {
   updateMissionProgress("purchaseCount");
   awardXp(10);
   state.logs.unshift(createLog(`Achat realise: ${item.name}.`));
-  commit(`${item.name} ajoute a ton inventaire.`);
+  commit(successMessage);
   await handleOnboardingAfterShopItem(item);
 }
 
@@ -5191,6 +5289,10 @@ async function buyAquariumSlot() {
   const cost = getNextAquariumCost();
   if (state.pearls < cost) {
     toast(`Il faut ${cost} perles pour debloquer un nouvel aquarium.`);
+    return;
+  }
+
+  if (!spendCycleMinutes(10, "le deblocage d'un aquarium")) {
     return;
   }
 
