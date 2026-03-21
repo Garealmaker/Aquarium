@@ -64,6 +64,7 @@ const ONBOARDING_FINAL_STEP = 13;
 const HIDDEN_VITALITY_POINTS = 10;
 const HIDDEN_VITALITY_STEP = 100 / HIDDEN_VITALITY_POINTS;
 const HIDDEN_VITALITY_RECOVERY_PER_HOUR = 100 / (CYCLE_STEP_HOURS * 2);
+const ASSET_VERSION = "20260321c";
 const CYCLE_COSTS = {
   cleanLight: 10,
   cleanDeep: 10,
@@ -1595,14 +1596,14 @@ function applyFishSpriteNode(node, species, className) {
   node.dataset.spriteDirection = String(sprite.direction);
   node.style.width = `${displayWidth.toFixed(2)}px`;
   node.style.height = `${displayHeight.toFixed(2)}px`;
-  node.style.setProperty("--sprite-image", `url("${sprite.file}")`);
+  node.style.setProperty("--sprite-image", `url("${withAssetVersion(sprite.file)}")`);
   node.style.setProperty("--tail-split", `${sprite.tailSplit}%`);
   node.style.setProperty("--tail-joint", `${sprite.tailJoint}%`);
   if (tailNode) {
-    tailNode.src = sprite.file;
+    tailNode.src = withAssetVersion(sprite.file);
   }
   if (bodyNode) {
-    bodyNode.src = sprite.file;
+    bodyNode.src = withAssetVersion(sprite.file);
   }
 }
 
@@ -1625,13 +1626,13 @@ function applyPlantSpriteNode(node, plantOrSpecies, scaleFactor = 1) {
   node.style.setProperty("--plant-sway-angle-neg", `${(-sprite.swayAngle * 0.52).toFixed(2)}deg`);
   node.style.setProperty("--plant-sway-duration", `6.8s`);
   if (stemNode) {
-    stemNode.src = sprite.file;
+    stemNode.src = withAssetVersion(sprite.file);
   }
   if (tipNode) {
-    tipNode.src = sprite.file;
+    tipNode.src = withAssetVersion(sprite.file);
   }
   if (rootNode) {
-    rootNode.src = sprite.file;
+    rootNode.src = withAssetVersion(sprite.file);
   }
 }
 
@@ -2008,6 +2009,13 @@ function getPlantLifespanCycles(plantOrSpecies) {
 
 function randomBetween(min, max) {
   return min + Math.random() * (max - min);
+}
+
+function withAssetVersion(path) {
+  if (!path) {
+    return path;
+  }
+  return `${path}${path.includes("?") ? "&" : "?"}v=${ASSET_VERSION}`;
 }
 
 function getPlantLightingMismatch(plant, aquarium = state.aquarium) {
