@@ -1,4 +1,4 @@
-# Aquariow Legacy
+# Aquarium
 
 Prototype de jeu navigateur inspire de la boucle de soin, de collection et de communaute d'un jeu d'aquariums virtuels.
 
