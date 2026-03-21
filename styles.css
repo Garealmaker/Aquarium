@@ -1134,13 +1134,25 @@ button:disabled {
 }
 
 .fish-sprite > span,
-.hero-fish > span {
+.hero-fish > span,
+.fish-sprite > img,
+.hero-fish > img {
   position: absolute;
   inset: 0;
-  background-image: var(--sprite-image);
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
-  background-position: center;
+}
+
+.fish-sprite > img,
+.hero-fish > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  user-select: none;
+  -webkit-user-drag: none;
+  image-rendering: auto;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .fish-sprite .fish-tail,

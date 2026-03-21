@@ -1566,18 +1566,18 @@ function getPlantFloorOffset(plantOrSpecies, depth, scaleFactor = 1) {
   const { sprite, displayHeight } = getPlantRenderMetrics(plantOrSpecies, scaleFactor);
   const rootRatio = clamp((sprite.rootCut || 20) / 100, 0.1, 0.28);
   const buryByDepth = {
-    [DEPTH_FRONT]: 0.92,
-    [DEPTH_MID]: 0.62,
-    [DEPTH_BACK]: 0.28,
+    [DEPTH_FRONT]: 1.08,
+    [DEPTH_MID]: 1.02,
+    [DEPTH_BACK]: 0.9,
   };
-  return displayHeight * rootRatio * (buryByDepth[depth] || buryByDepth[DEPTH_MID]);
+  return displayHeight * rootRatio * (buryByDepth[depth] || buryByDepth[DEPTH_MID]) + Math.max(2, displayHeight * 0.018);
 }
 
 function getPlantSoilY(depth = DEPTH_MID) {
   const soilLineByDepth = {
-    [DEPTH_FRONT]: 83.4,
-    [DEPTH_MID]: 82.6,
-    [DEPTH_BACK]: 81.8,
+    [DEPTH_FRONT]: 83.8,
+    [DEPTH_MID]: 83.2,
+    [DEPTH_BACK]: 82.4,
   };
   return soilLineByDepth[depth] || soilLineByDepth[DEPTH_MID];
 }
@@ -1588,6 +1588,8 @@ function applyFishSpriteNode(node, species, className) {
   const sizeScale = species?.sizeScale || 1;
   const displayHeight = sprite.displayHeight * sizeScale * (isHero ? 0.72 : 1);
   const displayWidth = Math.max(displayHeight * (sprite.w / sprite.h), displayHeight * 1.18);
+  const tailNode = node.querySelector(".fish-tail");
+  const bodyNode = node.querySelector(".fish-body");
 
   node.className = `${className} species-${species.id}`;
   node.dataset.spriteDirection = String(sprite.direction);
@@ -1596,6 +1598,12 @@ function applyFishSpriteNode(node, species, className) {
   node.style.setProperty("--sprite-image", `url("${sprite.file}")`);
   node.style.setProperty("--tail-split", `${sprite.tailSplit}%`);
   node.style.setProperty("--tail-joint", `${sprite.tailJoint}%`);
+  if (tailNode) {
+    tailNode.src = sprite.file;
+  }
+  if (bodyNode) {
+    bodyNode.src = sprite.file;
+  }
 }
 
 function applyPlantSpriteNode(node, plantOrSpecies, scaleFactor = 1) {
@@ -3814,8 +3822,8 @@ function createFishSpriteNode(species, className) {
   const node = document.createElement("div");
   node.setAttribute("aria-hidden", "true");
   node.innerHTML = `
-    <span class="fish-tail"></span>
-    <span class="fish-body"></span>
+    <img class="fish-tail" alt="" aria-hidden="true" draggable="false">
+    <img class="fish-body" alt="" aria-hidden="true" draggable="false">
   `;
   applyFishSpriteNode(node, species, className);
   setFishMotionState(node, className === "hero-fish" ? 0.45 : 0.32, Math.random() * Math.PI * 2, false);
