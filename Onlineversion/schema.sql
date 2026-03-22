@@ -1136,6 +1136,7 @@ security definer
 set search_path = public
 as $$
 declare
+  growth_test_mode boolean := true;
   aquarium_record public.aquariums%rowtype;
   plant_record record;
   fish_record record;
@@ -1222,7 +1223,12 @@ begin
     light_ok := aquarium_record.light_hours > 0
       and aquarium_record.light_hours between plant_record.light_min and plant_record.light_max;
     co2_ok := co2_coverage >= 1;
-    plant_dark_cycle_streak := case when aquarium_record.light_hours < 1 then plant_record.dark_cycle_streak + 1 else 0 end;
+    plant_dark_cycle_streak :=
+      case
+        when growth_test_mode then plant_record.dark_cycle_streak
+        when aquarium_record.light_hours < 1 then plant_record.dark_cycle_streak + 1
+        else 0
+      end;
 
     plant_failures :=
       case when temp_ok then 0 else 1 end +
@@ -1236,11 +1242,11 @@ begin
       plant_growth_gain := 0.09;
     else
       plant_new_streak := 0;
-      plant_new_vitality := greatest(0, plant_record.vitality_points - plant_failures);
+      plant_new_vitality := case when growth_test_mode then plant_record.vitality_points else greatest(0, plant_record.vitality_points - plant_failures) end;
       plant_growth_gain := case when plant_failures = 1 then 0.03 else 0 end;
     end if;
 
-    if plant_dark_cycle_streak >= 2 then
+    if not growth_test_mode and plant_dark_cycle_streak >= 2 then
       plant_new_vitality := 0;
     end if;
 
@@ -1250,7 +1256,7 @@ begin
       good_cycle_streak = plant_new_streak,
       dark_cycle_streak = plant_dark_cycle_streak,
       growth = least(1, greatest(0, coalesce(growth, 0) + plant_growth_gain)),
-      longevity_cycles_left = greatest(0, plant_record.longevity_cycles_left - 1),
+      longevity_cycles_left = case when growth_test_mode then plant_record.longevity_cycles_left else greatest(0, plant_record.longevity_cycles_left - 1) end,
       updated_at = now()
     where id = plant_record.id;
 
@@ -1298,12 +1304,17 @@ begin
       and f.aquarium_id = target_aquarium_id
     order by f.created_at
   loop
-    fish_new_hunger := greatest(0, fish_record.hunger - (9 + floor(random() * 12)::integer));
+    fish_new_hunger := case when growth_test_mode then fish_record.hunger else greatest(0, fish_record.hunger - (9 + floor(random() * 12)::integer)) end;
     temp_ok := aquarium_record.temperature_target between fish_record.temperature_min and fish_record.temperature_max;
     ph_ok := aquarium_record.ph_level between fish_record.ph_min and fish_record.ph_max;
     hunger_ok := fish_new_hunger > 0;
     oxygen_ok := oxygen_coverage >= 1;
-    fish_starving_cycle_streak := case when fish_new_hunger <= 0 then fish_record.starving_cycle_streak + 1 else 0 end;
+    fish_starving_cycle_streak :=
+      case
+        when growth_test_mode then fish_record.starving_cycle_streak
+        when fish_new_hunger <= 0 then fish_record.starving_cycle_streak + 1
+        else 0
+      end;
 
     fish_failures :=
       case when temp_ok then 0 else 1 end +
@@ -1316,10 +1327,10 @@ begin
       fish_new_vitality := case when fish_new_streak >= 2 then 10 else fish_record.vitality_points end;
     else
       fish_new_streak := 0;
-      fish_new_vitality := greatest(0, fish_record.vitality_points - fish_failures);
+      fish_new_vitality := case when growth_test_mode then fish_record.vitality_points else greatest(0, fish_record.vitality_points - fish_failures) end;
     end if;
 
-    if fish_starving_cycle_streak >= 2 then
+    if not growth_test_mode and fish_starving_cycle_streak >= 2 then
       fish_new_vitality := 0;
     end if;
 
@@ -1329,7 +1340,7 @@ begin
       vitality_points = fish_new_vitality,
       good_cycle_streak = fish_new_streak,
       starving_cycle_streak = fish_starving_cycle_streak,
-      longevity_cycles_left = greatest(0, fish_record.longevity_cycles_left - 1),
+      longevity_cycles_left = case when growth_test_mode then fish_record.longevity_cycles_left else greatest(0, fish_record.longevity_cycles_left - 1) end,
       updated_at = now()
     where id = fish_record.id;
   end loop;
@@ -1391,22 +1402,24 @@ begin
     end if;
   end loop;
 
-  delete from public.owned_plants
-  where user_id = target_user_id
-    and aquarium_id = target_aquarium_id
-    and (vitality_points <= 0 or longevity_cycles_left <= 0);
+  if not growth_test_mode then
+    delete from public.owned_plants
+    where user_id = target_user_id
+      and aquarium_id = target_aquarium_id
+      and (vitality_points <= 0 or longevity_cycles_left <= 0);
 
-  delete from public.owned_fish
-  where user_id = target_user_id
-    and aquarium_id = target_aquarium_id
-    and (vitality_points <= 0 or longevity_cycles_left <= 0);
+    delete from public.owned_fish
+    where user_id = target_user_id
+      and aquarium_id = target_aquarium_id
+      and (vitality_points <= 0 or longevity_cycles_left <= 0);
+  end if;
 
   update public.aquariums
   set
-    water_quality = greatest(0, least(100, water_quality - water_drop)),
-    ph_level = greatest(5.5, least(8.5, ph_level - ph_drop_total)),
+    water_quality = case when growth_test_mode then water_quality else greatest(0, least(100, water_quality - water_drop)) end,
+    ph_level = case when growth_test_mode then ph_level else greatest(5.5, least(8.5, ph_level - ph_drop_total)) end,
     co2_level = public.get_diffuser_output(diffuser_level),
-    feed_uses_this_cycle = 0,
+    feed_uses_this_cycle = case when growth_test_mode then feed_uses_this_cycle else 0 end,
     updated_at = now()
   where id = target_aquarium_id;
 end;

@@ -63,6 +63,7 @@ const CYCLE_MINUTES = 120;
 const CYCLE_REFRESH_MS = 12 * 60 * 60 * 1000;
 const CYCLE_ADVANCE_PEARL_COST = 3;
 const CYCLE_STEP_HOURS = 24;
+const CYCLE_GROWTH_TEST_MODE = true;
 const ONBOARDING_REWARD_COINS = 200;
 const ONBOARDING_REWARD_PEARLS = 10;
 const ONBOARDING_FINAL_STEP = 13;
@@ -1587,8 +1588,8 @@ function getPlantFloorOffset(plantOrSpecies, depth, scaleFactor = 1) {
 
 function getPlantSoilY(depth = DEPTH_MID) {
   const soilLineByDepth = {
-    [DEPTH_FRONT]: 84.6,
-    [DEPTH_MID]: 82.8,
+    [DEPTH_FRONT]: 85.2,
+    [DEPTH_MID]: 83.4,
     [DEPTH_BACK]: 82.4,
   };
   return soilLineByDepth[depth] || soilLineByDepth[DEPTH_MID];
@@ -2368,25 +2369,31 @@ function applyCycleToBundle(bundle, reason = "manual") {
   const waterQualityDrop = (randomBetween(5, 11) + feedUsesThisCycle) * (1 - filterReduction);
   const phDrop = randomBetween(0.1, 0.2);
   aquarium.foodResidue = clamp(aquarium.foodResidue + fish.length * 2.4, 0, 100);
-  aquarium.waterQuality = clamp(aquarium.waterQuality - waterQualityDrop, 0, 100);
+  aquarium.waterQuality = clamp(aquarium.waterQuality - (CYCLE_GROWTH_TEST_MODE ? 0 : waterQualityDrop), 0, 100);
   aquarium.pollution = clamp(100 - aquarium.waterQuality, 0, 100);
-  aquarium.phLevel = clamp(aquarium.phLevel - phDrop, 5.5, 8.5);
-  aquarium.feedUsesThisCycle = 0;
+  aquarium.phLevel = clamp(aquarium.phLevel - (CYCLE_GROWTH_TEST_MODE ? 0 : phDrop), 5.5, 8.5);
+  aquarium.feedUsesThisCycle = CYCLE_GROWTH_TEST_MODE ? aquarium.feedUsesThisCycle : 0;
   const oxygenProduced = getOxygenProductionRate(aquarium, plantsPlaced);
   const oxygenConsumed = getOxygenConsumptionRate(aquarium, fish);
   aquarium.oxygenLevel = clamp(oxygenConsumed <= 0 ? 100 : (oxygenProduced / oxygenConsumed) * 100, 0, 100);
 
   plantsPlaced = plantsPlaced.map((plant) => {
     const missingConditions = getPlantMissingConditionCount(plant, aquarium, plantsPlaced);
-    const darkCycleStreak = numericOr(aquarium.lightHours, 0) < 1 ? numericOr(plant.darkCycleStreak, 0) + 1 : 0;
+    const darkCycleStreak = CYCLE_GROWTH_TEST_MODE
+      ? numericOr(plant.darkCycleStreak, 0)
+      : numericOr(aquarium.lightHours, 0) < 1
+        ? numericOr(plant.darkCycleStreak, 0) + 1
+        : 0;
     const nextGoodCycleStreak = missingConditions === 0 ? numericOr(plant.goodCycleStreak, 0) + 1 : 0;
     const healthy = missingConditions === 0;
     const growthGain = healthy ? 0.09 : missingConditions === 1 ? 0.03 : 0;
     let vitality =
       nextGoodCycleStreak >= 2
         ? 100
-        : clamp(plant.vitality - missingConditions * HIDDEN_VITALITY_STEP, 0, 100);
-    if (darkCycleStreak >= 2) {
+        : CYCLE_GROWTH_TEST_MODE
+          ? plant.vitality
+          : clamp(plant.vitality - missingConditions * HIDDEN_VITALITY_STEP, 0, 100);
+    if (!CYCLE_GROWTH_TEST_MODE && darkCycleStreak >= 2) {
       vitality = 0;
     }
     return {
@@ -2395,23 +2402,35 @@ function applyCycleToBundle(bundle, reason = "manual") {
       goodCycleStreak: nextGoodCycleStreak,
       darkCycleStreak,
       growth: clamp(numericOr(plant.growth, 0) + growthGain, 0, 1),
-      longevity: clamp(plant.longevity - 100 / getPlantLifespanCycles(plant), 0, 100),
-      badConditionHours: missingConditions === 0 ? 0 : plant.badConditionHours + CYCLE_STEP_HOURS,
+      longevity: CYCLE_GROWTH_TEST_MODE
+        ? plant.longevity
+        : clamp(plant.longevity - 100 / getPlantLifespanCycles(plant), 0, 100),
+      badConditionHours: CYCLE_GROWTH_TEST_MODE
+        ? plant.badConditionHours
+        : missingConditions === 0
+          ? 0
+          : plant.badConditionHours + CYCLE_STEP_HOURS,
     };
   });
 
   fish = fish.map((entry) => {
-    const nextHunger = clamp(entry.hunger - hungerDrop, 0, 100);
+    const nextHunger = CYCLE_GROWTH_TEST_MODE ? entry.hunger : clamp(entry.hunger - hungerDrop, 0, 100);
     const missingConditions = getFishMissingConditionCount(entry, aquarium, fish, plantsPlaced, nextHunger);
-    const starvingCycleStreak = nextHunger <= 0 ? numericOr(entry.starvingCycleStreak, 0) + 1 : 0;
+    const starvingCycleStreak = CYCLE_GROWTH_TEST_MODE
+      ? numericOr(entry.starvingCycleStreak, 0)
+      : nextHunger <= 0
+        ? numericOr(entry.starvingCycleStreak, 0) + 1
+        : 0;
     const nextGoodCycleStreak = missingConditions === 0 ? numericOr(entry.goodCycleStreak, 0) + 1 : 0;
     const healthy = missingConditions === 0;
     const growthGain = healthy && nextHunger > 16 ? 0.03 : healthy ? 0.012 : 0.002;
     let vitality =
       nextGoodCycleStreak >= 2
         ? 100
-        : clamp(entry.vitality - missingConditions * HIDDEN_VITALITY_STEP, 0, 100);
-    if (starvingCycleStreak >= 2) {
+        : CYCLE_GROWTH_TEST_MODE
+          ? entry.vitality
+          : clamp(entry.vitality - missingConditions * HIDDEN_VITALITY_STEP, 0, 100);
+    if (!CYCLE_GROWTH_TEST_MODE && starvingCycleStreak >= 2) {
       vitality = 0;
     }
     const longevityPenalty = healthy ? 0 : 1.6 + Math.max(0, 50 - entry.comfort) * 0.035;
@@ -2421,11 +2440,17 @@ function applyCycleToBundle(bundle, reason = "manual") {
       goodCycleStreak: nextGoodCycleStreak,
       starvingCycleStreak,
       newcomerHours: Math.max(entry.newcomerHours - CYCLE_STEP_HOURS, 0),
-      badConditionHours: healthy ? 0 : entry.badConditionHours + CYCLE_STEP_HOURS,
+      badConditionHours: CYCLE_GROWTH_TEST_MODE
+        ? entry.badConditionHours
+        : healthy
+          ? 0
+          : entry.badConditionHours + CYCLE_STEP_HOURS,
       hunger: nextHunger,
       growth: clamp(entry.growth + growthGain, 0, 1),
       vitality,
-      longevity: clamp(entry.longevity - (100 / getFishLifespanCycles(entry) + longevityPenalty * 0.1), 0, 100),
+      longevity: CYCLE_GROWTH_TEST_MODE
+        ? entry.longevity
+        : clamp(entry.longevity - (100 / getFishLifespanCycles(entry) + longevityPenalty * 0.1), 0, 100),
     };
   });
 
