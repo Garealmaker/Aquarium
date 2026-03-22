@@ -1588,8 +1588,8 @@ function getPlantFloorOffset(plantOrSpecies, depth, scaleFactor = 1) {
 
 function getPlantSoilY(depth = DEPTH_MID) {
   const soilLineByDepth = {
-    [DEPTH_FRONT]: 85.6,
-    [DEPTH_MID]: 83.8,
+    [DEPTH_FRONT]: 86.0,
+    [DEPTH_MID]: 84.2,
     [DEPTH_BACK]: 82.4,
   };
   return soilLineByDepth[depth] || soilLineByDepth[DEPTH_MID];
@@ -1715,7 +1715,7 @@ function applyFishSpriteNode(node, species, className) {
   const sprite = getFishSpriteConfig(species);
   const isHero = className === "hero-fish";
   const sizeScale = species?.sizeScale || 1;
-  const displayHeight = sprite.displayHeight * sizeScale * (isHero ? 0.72 : 1);
+  const displayHeight = sprite.displayHeight * sizeScale * (isHero ? 0.72 : 1) * 1.2;
   const displayWidth = Math.max(displayHeight * (sprite.w / sprite.h), displayHeight * 1.18);
   const tailNode = node.querySelector(".fish-tail");
   const bodyNode = node.querySelector(".fish-body");
@@ -3906,8 +3906,8 @@ function syncDecorNodes() {
 
   scenicItems.forEach((placement) => {
     const node = document.createElement("div");
-    const scale = depthScale(placement.depth);
-    const brightness = depthBrightness(placement.depth);
+    const scale = getDecorDepthScale(placement.depth);
+    const brightness = getDecorDepthBrightness(placement.depth);
     const floorOffset = getPlantFloorOffset(placement, placement.depth);
     applyPlantSpriteNode(node, placement);
     node.style.left = `${snapSceneXPercentToSlot(placement.x, placement.depth)}%`;
@@ -4104,6 +4104,14 @@ function depthScale(depth) {
 function depthBrightness(depth) {
   const normalizedDepth = clamp(depth, DEPTH_FRONT, DEPTH_BACK);
   return 1 - (normalizedDepth - DEPTH_FRONT) * 0.25;
+}
+
+function getDecorDepthScale(depth) {
+  return normalizePlantDepth(depth) === DEPTH_FRONT ? 1 : 0.7;
+}
+
+function getDecorDepthBrightness(depth) {
+  return normalizePlantDepth(depth) === DEPTH_FRONT ? 1 : 0.72;
 }
 
 function depthOpacity(depth) {
@@ -4450,8 +4458,8 @@ function updatePlacementCursor(event) {
   const slotIndex = getNearestSceneSlotIndex(rawXPercent, placementDepth, 1);
   const xPercent = getSceneSlotCenterPercent(placementDepth, slotIndex, 1);
   const yPercent = getPlantSoilY(placementDepth);
-  const scale = depthScale(placementDepth);
-  const brightness = depthBrightness(placementDepth);
+  const scale = getDecorDepthScale(placementDepth);
+  const brightness = getDecorDepthBrightness(placementDepth);
   const selection = parsePlacementKey(runtime.selectedPlacementKey);
   const previewSpeciesId =
     selection?.category === "plant-instance"
