@@ -173,8 +173,8 @@ set
   depth = case when depth = 1 then 1 else 2 end,
   x_percent =
     case
-      when depth = 1 then 10 + greatest(0, least(5, round((coalesce(x_percent, 10) - 10) / 16.0)::integer)) * 16
-      else 12 + greatest(0, least(5, round((coalesce(x_percent, 12) - 12) / 16.0)::integer)) * 16
+      when depth = 1 then 10.5 + greatest(0, least(5, round((coalesce(x_percent, 10.5) - 10.5) / 16.0)::integer)) * 16
+      else 11.5 + greatest(0, least(5, round((coalesce(x_percent, 11.5) - 11.5) / 16.0)::integer)) * 16
     end
 where true;
 
@@ -2757,8 +2757,8 @@ declare
   plant_record public.owned_plants%rowtype;
   aquarium_record public.aquariums%rowtype;
   normalized_depth integer := case when target_depth = 1 then 1 else 2 end;
-  normalized_x_seed numeric := coalesce(target_x_percent, case when target_depth = 1 then 42 else 44 end);
-  slot_origin numeric := case when target_depth = 1 then 10 else 12 end;
+  normalized_x_seed numeric := coalesce(target_x_percent, case when target_depth = 1 then 42.5 else 43.5 end);
+  slot_origin numeric := case when target_depth = 1 then 10.5 else 11.5 end;
   normalized_slot_index integer := 0;
   normalized_x numeric := 0;
   effective_aquarium_id uuid;
