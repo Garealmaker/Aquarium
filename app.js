@@ -1570,7 +1570,7 @@ function getPlantRenderMetrics(plantOrSpecies, scaleFactor = 1) {
   const maxSize = numericOr(species?.maxSizeCm, 20);
   const currentSize = getPlantCurrentSizeCm(plantOrSpecies);
   const sizeRatio = maxSize <= 0 ? 1 : clamp(currentSize / maxSize, 0.18, 1);
-  const displayHeight = sprite.displayHeight * sizeScale * sizeRatio * 2 * scaleFactor;
+  const displayHeight = sprite.displayHeight * sizeScale * sizeRatio * 2 * scaleFactor * 1.5;
   const displayWidth = Math.max(displayHeight * (sprite.w / sprite.h), displayHeight * 0.38);
   return { sprite, displayHeight, displayWidth };
 }
