@@ -1035,6 +1035,51 @@ button:disabled {
   color: var(--text-main);
 }
 
+.placement-list-section {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.placement-slot-title {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+}
+
+.placement-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.placement-slot-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.placement-slot-chip.free {
+  color: rgba(175, 243, 220, 0.96);
+  background: rgba(123, 224, 192, 0.1);
+  border-color: rgba(123, 224, 192, 0.22);
+}
+
+.placement-slot-chip.occupied {
+  color: rgba(255, 190, 190, 0.92);
+  background: rgba(255, 126, 126, 0.08);
+  border-color: rgba(255, 126, 126, 0.18);
+}
+
 .placement-preview {
   position: relative;
   width: 42px;

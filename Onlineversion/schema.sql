@@ -5,8 +5,8 @@ create table if not exists public.profiles (
   email text,
   player_name text,
   birth_date date,
-  coins integer not null default 240,
-  pearls integer not null default 12,
+  coins integer not null default 500,
+  pearls integer not null default 100,
   level integer not null default 1,
   xp integer not null default 0,
   created_at timestamptz not null default now(),
@@ -15,8 +15,8 @@ create table if not exists public.profiles (
 
 alter table public.profiles add column if not exists player_name text;
 alter table public.profiles add column if not exists birth_date date;
-alter table public.profiles add column if not exists coins integer not null default 240;
-alter table public.profiles add column if not exists pearls integer not null default 12;
+alter table public.profiles add column if not exists coins integer not null default 500;
+alter table public.profiles add column if not exists pearls integer not null default 100;
 alter table public.profiles add column if not exists level integer not null default 1;
 alter table public.profiles add column if not exists xp integer not null default 0;
 alter table public.profiles add column if not exists updated_at timestamptz not null default now();
@@ -167,6 +167,12 @@ alter table public.owned_plants add column if not exists x_percent numeric(5,2) 
 alter table public.owned_plants add column if not exists growth numeric(6,4) not null default 0;
 alter table public.owned_fish add column if not exists starving_cycle_streak integer not null default 0;
 alter table public.owned_plants add column if not exists dark_cycle_streak integer not null default 0;
+
+update public.owned_plants
+set
+  depth = case when depth = 1 then 1 else 2 end,
+  x_percent = 11 + greatest(0, least(5, round((coalesce(x_percent, 11) - 11) / 16.0)::integer)) * 16
+where true;
 
 create table if not exists public.fry_batches (
   id uuid primary key default gen_random_uuid(),
@@ -448,8 +454,8 @@ begin
         then (new.raw_user_meta_data->>'birth_date')::date
       else null
     end,
-    240,
-    12,
+    500,
+    100,
     1,
     0,
     now()
@@ -1433,7 +1439,7 @@ begin
     return;
   end if;
 
-  cycles_due := floor(greatest(extract(epoch from (now() - cycle_anchor.last_auto_cycle_at)), 0) / 14400)::integer;
+  cycles_due := floor(greatest(extract(epoch from (now() - cycle_anchor.last_auto_cycle_at)), 0) / 43200)::integer;
 
   if cycles_due <= 0 then
     return;
@@ -1451,7 +1457,7 @@ begin
   end loop;
 
   next_cycle_number := coalesce(cycle_anchor.cycle_number, 1) + cycles_due;
-  next_auto_cycle_at := cycle_anchor.last_auto_cycle_at + make_interval(hours => cycles_due * 4);
+  next_auto_cycle_at := cycle_anchor.last_auto_cycle_at + make_interval(hours => cycles_due * 12);
 
   update public.aquariums
   set
@@ -1482,8 +1488,8 @@ begin
     current_user_id,
     auth.jwt()->>'email',
     coalesce(nullif(split_part(auth.jwt()->>'email', '@', 1), ''), 'Gardien des recifs'),
-    240,
-    12,
+    500,
+    100,
     1,
     0,
     now()
@@ -1552,8 +1558,6 @@ begin
   where user_id = current_user_id
   order by slot_index
   limit 1;
-
-  perform public.spend_user_cycle_minutes(current_user_id, 10);
 
   update public.aquariums
   set
@@ -1681,7 +1685,7 @@ begin
       and user_id = current_user_id;
   end if;
 
-  perform public.append_journal_log_entry(current_user_id, 'Le cycle suivant commence immediatement.', target_aquarium_id);
+  perform public.append_journal_log_entry(current_user_id, 'Le cycle suivant commence immediatement, sans consommer de temps.', target_aquarium_id);
 
   return public.get_player_core_state_by_user(current_user_id);
 end;
@@ -2749,7 +2753,11 @@ declare
   plant_record public.owned_plants%rowtype;
   aquarium_record public.aquariums%rowtype;
   normalized_depth integer := case when target_depth = 1 then 1 else 2 end;
-  normalized_x numeric := greatest(6, least(94, coalesce(target_x_percent, 50)));
+  normalized_x_seed numeric := greatest(11, least(91, coalesce(target_x_percent, 43)));
+  normalized_slot_index integer := greatest(0, least(5, round((normalized_x_seed - 11) / 16.0)::integer));
+  normalized_x numeric := 11 + normalized_slot_index * 16;
+  effective_aquarium_id uuid;
+  conflicting_plant_id uuid;
 begin
   if current_user_id is null then
     raise exception 'Authentification requise';
@@ -2766,6 +2774,24 @@ begin
 
   if plant_record.id is null then
     raise exception 'Plante introuvable ou non autorisee';
+  end if;
+
+  effective_aquarium_id := coalesce(target_aquarium_id, plant_record.aquarium_id);
+
+  if target_aquarium_id is not null and effective_aquarium_id is not null then
+    select p.id
+    into conflicting_plant_id
+    from public.owned_plants p
+    where p.user_id = current_user_id
+      and p.aquarium_id = effective_aquarium_id
+      and p.depth = normalized_depth
+      and p.x_percent = normalized_x
+      and p.id <> target_plant_id
+    limit 1;
+
+    if conflicting_plant_id is not null then
+      raise exception 'Cet emplacement est deja occupe';
+    end if;
   end if;
 
   if plant_record.aquarium_id is null then

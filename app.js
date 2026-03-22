@@ -53,9 +53,14 @@ const LEGACY_PLANT_SPECIES_MAP = {
   "kelp-spiral": "echinodorus-bleheri",
 };
 const ALLOWED_PLANT_DEPTHS = [DEPTH_FRONT, DEPTH_MID];
+const SCENE_DEPTH_SLOT_COUNT = 6;
+const SCENE_SLOT_CENTERS = {
+  [DEPTH_FRONT]: [11, 27, 43, 59, 75, 91],
+  [DEPTH_MID]: [11, 27, 43, 59, 75, 91],
+};
 const MAX_AQUARIUMS = 4;
 const CYCLE_MINUTES = 120;
-const CYCLE_REFRESH_MS = 4 * 60 * 60 * 1000;
+const CYCLE_REFRESH_MS = 12 * 60 * 60 * 1000;
 const CYCLE_ADVANCE_PEARL_COST = 3;
 const CYCLE_STEP_HOURS = 24;
 const ONBOARDING_REWARD_COINS = 200;
@@ -617,15 +622,18 @@ function applyServerCoreState(coreState) {
       });
     });
 
-    const nextPlantsPlaced = (serverAquarium.plants || []).map((serverPlant, index) => {
+    const nextPlantsPlaced = resolvePlantSlotConflicts((serverAquarium.plants || []).map((serverPlant, index) => {
       const existing = previousPlantMap.get(serverPlant.id);
       const depth = normalizePlantDepth(serverPlant.depth);
       return {
-        ...(existing || createPlacedPlant(serverPlant.species_id, 18 + (index % 4) * 18, getPlantSoilY(depth), depth)),
+        ...(existing || createPlacedPlant(serverPlant.species_id, getSceneSlotCenterPercent(depth, index % SCENE_DEPTH_SLOT_COUNT), getPlantSoilY(depth), depth)),
         id: serverPlant.id,
         speciesId: serverPlant.species_id,
         nickname: serverPlant.nickname,
-        x: clamp(numericOr(serverPlant.x_percent, existing?.x ?? 18 + (index % 4) * 18), 6, 94),
+        x: snapSceneXPercentToSlot(
+          numericOr(serverPlant.x_percent, existing?.x ?? getSceneSlotCenterPercent(depth, index % SCENE_DEPTH_SLOT_COUNT)),
+          depth
+        ),
         y: getPlantSoilY(depth),
         depth,
         vitality: clamp(numericOr(serverPlant.vitality_points, 10) * HIDDEN_VITALITY_STEP, 0, 100),
@@ -638,7 +646,7 @@ function applyServerCoreState(coreState) {
         ),
         placedAt: numericOr(existing?.placedAt, Date.now()),
       };
-    });
+    }));
 
     const nextFryBatches = normalizeFryBatches(
       Array.isArray(serverAquarium.fry_batches)
@@ -906,11 +914,12 @@ function createFish(speciesId, overrides = {}) {
 
 function createPlacedPlant(speciesId, x, y, depth = DEPTH_MID) {
   const placementDepth = normalizePlantDepth(depth);
+  const snappedX = snapSceneXPercentToSlot(x, placementDepth);
   return {
     id: `plant-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
     speciesId,
     nickname: getPlantSpecies(speciesId)?.species || speciesId,
-    x,
+    x: snappedX,
     y: getPlantSoilY(placementDepth),
     depth: placementDepth,
     vitality: 100,
@@ -955,8 +964,9 @@ function normalizePlacedPlants(raw, sourceVersion = SAVE_SCHEMA_VERSION) {
     return [];
   }
 
-  return raw
-    .map((entry, index) => {
+  return resolvePlantSlotConflicts(
+    raw
+      .map((entry, index) => {
       if (!entry || typeof entry !== "object" || !entry.speciesId) {
         return null;
       }
@@ -966,7 +976,7 @@ function normalizePlacedPlants(raw, sourceVersion = SAVE_SCHEMA_VERSION) {
         id: entry.id || `plant-${index}-${speciesId}`,
         speciesId,
         nickname: entry.nickname || getPlantSpecies(speciesId)?.species || speciesId,
-        x: clamp(numericOr(entry.x, 50), 6, 94),
+        x: snapSceneXPercentToSlot(numericOr(entry.x, 50), placementDepth),
         depth: placementDepth,
         y: getPlantSoilY(placementDepth),
         vitality: clamp(numericOr(entry.vitality, 100), 0, 100),
@@ -978,8 +988,9 @@ function normalizePlacedPlants(raw, sourceVersion = SAVE_SCHEMA_VERSION) {
         lastCompetitionDateKey: entry.lastCompetitionDateKey || "",
         placedAt: entry.placedAt || Date.now(),
       };
-    })
-    .filter(Boolean);
+      })
+      .filter(Boolean)
+  );
 }
 
 function normalizeFishState(raw) {
@@ -1583,6 +1594,122 @@ function getPlantSoilY(depth = DEPTH_MID) {
   return soilLineByDepth[depth] || soilLineByDepth[DEPTH_MID];
 }
 
+function getSceneDepthLabel(depth) {
+  return normalizePlantDepth(depth) === DEPTH_FRONT ? "Avant" : "Fond";
+}
+
+function getSceneSlotCenters(depth = DEPTH_MID) {
+  return SCENE_SLOT_CENTERS[normalizePlantDepth(depth)] || SCENE_SLOT_CENTERS[DEPTH_MID];
+}
+
+function getSceneSlotCenterPercent(depth = DEPTH_MID, slotIndex = 0, slotSpan = 1) {
+  const centers = getSceneSlotCenters(depth);
+  const clampedIndex = clamp(Math.round(slotIndex), 0, centers.length - 1);
+  const clampedSpan = Math.max(1, Math.round(slotSpan));
+  const startCenter = centers[clampedIndex];
+  const endCenter = centers[Math.min(centers.length - 1, clampedIndex + clampedSpan - 1)];
+  return (startCenter + endCenter) / 2;
+}
+
+function getNearestSceneSlotIndex(xPercent, depth = DEPTH_MID, slotSpan = 1) {
+  const centers = getSceneSlotCenters(depth);
+  const clampedSpan = Math.max(1, Math.round(slotSpan));
+  const maxStartIndex = Math.max(0, centers.length - clampedSpan);
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let slotIndex = 0; slotIndex <= maxStartIndex; slotIndex += 1) {
+    const center = getSceneSlotCenterPercent(depth, slotIndex, clampedSpan);
+    const distanceToCenter = Math.abs(center - numericOr(xPercent, centers[0]));
+    if (distanceToCenter < bestDistance) {
+      bestDistance = distanceToCenter;
+      bestIndex = slotIndex;
+    }
+  }
+  return bestIndex;
+}
+
+function snapSceneXPercentToSlot(xPercent, depth = DEPTH_MID, slotSpan = 1) {
+  return getSceneSlotCenterPercent(depth, getNearestSceneSlotIndex(xPercent, depth, slotSpan), slotSpan);
+}
+
+function getSceneItemSlotSpan(category, id) {
+  if (category === "plant" || category === "plant-instance") {
+    return 1;
+  }
+  return 1;
+}
+
+function getPlantSlotIndex(plant) {
+  return getNearestSceneSlotIndex(plant?.x, plant?.depth, 1);
+}
+
+function getOccupiedSceneSlots(depth, ignorePlantId = null) {
+  const occupiedSlots = new Set();
+  state.plantsPlaced.forEach((plant) => {
+    if (ignorePlantId && plant.id === ignorePlantId) {
+      return;
+    }
+    if (normalizePlantDepth(plant.depth) !== normalizePlantDepth(depth)) {
+      return;
+    }
+    occupiedSlots.add(getPlantSlotIndex(plant));
+  });
+  return occupiedSlots;
+}
+
+function isSceneSlotOccupied(depth, slotIndex, slotSpan = 1, ignorePlantId = null) {
+  const occupiedSlots = getOccupiedSceneSlots(depth, ignorePlantId);
+  for (let index = 0; index < Math.max(1, Math.round(slotSpan)); index += 1) {
+    if (occupiedSlots.has(slotIndex + index)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function getAvailableSceneSlotEntries(depth, slotSpan = 1, ignorePlantId = null) {
+  const depthValue = normalizePlantDepth(depth);
+  const maxStartIndex = Math.max(0, SCENE_DEPTH_SLOT_COUNT - Math.max(1, Math.round(slotSpan)));
+  return Array.from({ length: maxStartIndex + 1 }, (_, slotIndex) => ({
+    slotIndex,
+    centerPercent: getSceneSlotCenterPercent(depthValue, slotIndex, slotSpan),
+    occupied: isSceneSlotOccupied(depthValue, slotIndex, slotSpan, ignorePlantId),
+  }));
+}
+
+function findNearestFreeSceneSlotIndex(preferredSlotIndex, occupiedSlots, slotSpan = 1) {
+  const maxStartIndex = Math.max(0, SCENE_DEPTH_SLOT_COUNT - Math.max(1, Math.round(slotSpan)));
+  const candidates = Array.from({ length: maxStartIndex + 1 }, (_, index) => index)
+    .filter((slotIndex) => {
+      for (let offset = 0; offset < Math.max(1, Math.round(slotSpan)); offset += 1) {
+        if (occupiedSlots.has(slotIndex + offset)) {
+          return false;
+        }
+      }
+      return true;
+    })
+    .sort((left, right) => Math.abs(left - preferredSlotIndex) - Math.abs(right - preferredSlotIndex));
+  return candidates[0] ?? clamp(preferredSlotIndex, 0, maxStartIndex);
+}
+
+function resolvePlantSlotConflicts(plants) {
+  const occupiedByDepth = new Map(ALLOWED_PLANT_DEPTHS.map((depth) => [depth, new Set()]));
+  return plants.map((plant) => {
+    const depth = normalizePlantDepth(plant.depth);
+    const occupiedSlots = occupiedByDepth.get(depth) || new Set();
+    const preferredSlotIndex = getNearestSceneSlotIndex(plant.x, depth, 1);
+    const slotIndex = findNearestFreeSceneSlotIndex(preferredSlotIndex, occupiedSlots, 1);
+    occupiedSlots.add(slotIndex);
+    occupiedByDepth.set(depth, occupiedSlots);
+    return {
+      ...plant,
+      depth,
+      x: getSceneSlotCenterPercent(depth, slotIndex, 1),
+      y: getPlantSoilY(depth),
+    };
+  });
+}
+
 function applyFishSpriteNode(node, species, className) {
   const sprite = getFishSpriteConfig(species);
   const isHero = className === "hero-fish";
@@ -1717,8 +1844,8 @@ function buildDefaultState() {
     resetNonce: SAVE_RESET_NONCE,
     playerName: "Gardien des recifs",
     aquariumName: starterAquarium.name,
-    coins: 240,
-    pearls: 12,
+    coins: 500,
+    pearls: 100,
     level: 1,
     xp: 12,
     cycleState: {
@@ -2182,7 +2309,7 @@ function startNewCycle(reason = "paid") {
   state.logs.unshift(
     createLog(
       reason === "auto"
-        ? `Le cycle ${cycleState.cycleNumber} commence automatiquement apres 4 h.`
+        ? `Le cycle ${cycleState.cycleNumber} commence automatiquement apres 12 h.`
         : `Le cycle ${cycleState.cycleNumber} commence contre ${CYCLE_ADVANCE_PEARL_COST} perles.`
     )
   );
@@ -3113,7 +3240,7 @@ function renderCycleStatus() {
   els.advanceCycleBtn.textContent =
     getOnboardingState().step === 8
       ? "Premier cycle gratuit"
-      : `Cycle suivant (${CYCLE_ADVANCE_PEARL_COST} perles)`;
+      : `Cycle suivant (${CYCLE_ADVANCE_PEARL_COST} perles, 0 min)`;
   if (els.dailyRewardBtn) {
     const canClaim = canClaimDailyReward();
     els.dailyRewardBtn.disabled = onlineBlocked || !canClaim;
@@ -3504,7 +3631,7 @@ function renderPlantCards() {
     const species = getPlantSpecies(plant.speciesId);
     const careState = getPlantCareState(plant);
     const node = document.createElement("article");
-    const depthLabel = plant.depth === DEPTH_FRONT ? "Avant" : "Milieu";
+    const depthLabel = getSceneDepthLabel(plant.depth);
     node.className = "fish-card";
     node.innerHTML = `
       <div class="fish-card-top">
@@ -3607,7 +3734,7 @@ function openPlantPlacement(plantId) {
     runtime.tankTab = "overview";
     els.placementCursor.hidden = false;
     render();
-    toast("Clique dans l'aquarium pour planter cet exemplaire.");
+    toast("Clique un emplacement libre dans l'aquarium pour planter cet exemplaire.");
     return;
   }
   if (getOwnedPlantCount(plantId) <= 0) {
@@ -3620,7 +3747,7 @@ function openPlantPlacement(plantId) {
   runtime.tankTab = "overview";
   els.placementCursor.hidden = false;
   render();
-  toast("Clique dans l'aquarium pour planter cet exemplaire.");
+  toast("Clique un emplacement libre dans l'aquarium pour planter cet exemplaire.");
 }
 
 function openPlantMove(plantId) {
@@ -3629,7 +3756,7 @@ function openPlantMove(plantId) {
   els.placementCursor.hidden = false;
   selectPlantForMove(plantId);
   render();
-  toast("Clique dans l'aquarium pour replacer cette plante.");
+  toast("Clique un emplacement libre dans l'aquarium pour replacer cette plante.");
 }
 
 async function returnPlantToInventory(plantId) {
@@ -3681,12 +3808,13 @@ function renderPlacementPanel() {
   els.sceneHint.hidden = !runtime.placementMode;
   els.placementList.innerHTML = "";
   els.sceneHint.textContent = runtime.movingPlantId
-    ? "Clique dans l'aquarium pour repositionner la plante selectionnee."
-    : "Choisis une plante a placer, ou clique une plante deja enracinee pour la deplacer.";
+    ? "Choisis une rangee, puis clique un emplacement libre dans l'aquarium pour deplacer la plante selectionnee."
+    : "Choisis une plante a placer, puis clique un emplacement libre dans l'aquarium.";
 
   els.placementDepths.forEach((button) => {
     const buttonDepth = normalizePlantDepth(Number(button.dataset.depth));
     button.classList.toggle("active", buttonDepth === runtime.selectedDepth);
+    button.textContent = getSceneDepthLabel(buttonDepth);
   });
 
   if (actions.length === 0) {
@@ -3718,45 +3846,30 @@ function renderPlacementPanel() {
     });
     els.placementList.appendChild(button);
   });
-}
 
-function getPlantCollisionZone(speciesId, depth) {
-  const species = getPlantSpecies(speciesId);
-  const { displayHeight: height } = getPlantRenderMetrics(species);
-  const scale = depthScale(depth);
-  return {
-    x: clamp((height / 12) * scale, 5.5, 10.5),
-    y: clamp((height / 10) * scale, 7, 14),
-  };
-}
-
-function getSceneCollisionZone(category, id, depth) {
-  return getPlantCollisionZone(id, depth);
+  const slotSummary = document.createElement("div");
+  slotSummary.className = "placement-list-section";
+  const activeDepth = normalizePlantDepth(runtime.selectedDepth);
+  const slots = getAvailableSceneSlotEntries(activeDepth, 1, runtime.movingPlantId);
+  const title = document.createElement("p");
+  title.className = "placement-slot-title";
+  title.textContent = `${getSceneDepthLabel(activeDepth)} : ${slots.filter((slot) => !slot.occupied).length}/${SCENE_DEPTH_SLOT_COUNT} emplacements libres`;
+  const grid = document.createElement("div");
+  grid.className = "placement-slot-grid";
+  slots.forEach((slot) => {
+    const chip = document.createElement("span");
+    chip.className = `placement-slot-chip ${slot.occupied ? "occupied" : "free"}`;
+    chip.textContent = `${slot.slotIndex + 1}`;
+    grid.appendChild(chip);
+  });
+  slotSummary.append(title, grid);
+  els.placementList.appendChild(slotSummary);
 }
 
 function scenePlacementCollidesAt(x, y, depth, id, category, ignorePlantId = null) {
-  const candidateZone = getSceneCollisionZone(category, id, depth);
-  const placedItems = state.plantsPlaced.map((placement) => ({
-    category: "plant",
-    plantId: placement.id,
-    speciesId: placement.speciesId,
-    x: placement.x,
-    y: placement.y,
-    depth: placement.depth,
-  }));
-
-  return placedItems.some((placement) => {
-    if (ignorePlantId && placement.plantId === ignorePlantId) {
-      return false;
-    }
-    if (placement.depth !== depth) {
-      return false;
-    }
-    const zone = getSceneCollisionZone(placement.category, placement.speciesId, placement.depth);
-    const dx = (placement.x - x) / (candidateZone.x + zone.x);
-    const dy = (placement.y - y) / (candidateZone.y + zone.y);
-    return dx * dx + dy * dy < 1;
-  });
+  const slotSpan = getSceneItemSlotSpan(category, id);
+  const slotIndex = getNearestSceneSlotIndex(x, depth, slotSpan);
+  return isSceneSlotOccupied(depth, slotIndex, slotSpan, ignorePlantId);
 }
 
 function syncDecorNodes() {
@@ -3772,7 +3885,7 @@ function syncDecorNodes() {
     const brightness = depthBrightness(placement.depth);
     const floorOffset = getPlantFloorOffset(placement, placement.depth);
     applyPlantSpriteNode(node, placement);
-    node.style.left = `${placement.x}%`;
+    node.style.left = `${snapSceneXPercentToSlot(placement.x, placement.depth)}%`;
     node.style.bottom = `calc(${(100 - getPlantSoilY(placement.depth)).toFixed(2)}% - ${floorOffset.toFixed(2)}px)`;
     node.style.opacity = "1";
     node.style.transform = `translateX(-50%) scale(${scale})`;
@@ -4307,8 +4420,10 @@ function updatePlacementCursor(event) {
   }
 
   const rect = els.aquariumStage.getBoundingClientRect();
-  const xPercent = clamp(((event.clientX - rect.left) / rect.width) * 100, 6, 94);
+  const rawXPercent = clamp(((event.clientX - rect.left) / rect.width) * 100, 6, 94);
   const placementDepth = normalizePlantDepth(runtime.selectedDepth);
+  const slotIndex = getNearestSceneSlotIndex(rawXPercent, placementDepth, 1);
+  const xPercent = getSceneSlotCenterPercent(placementDepth, slotIndex, 1);
   const yPercent = getPlantSoilY(placementDepth);
   const scale = depthScale(placementDepth);
   const brightness = depthBrightness(placementDepth);
@@ -4349,6 +4464,7 @@ function updatePlacementCursor(event) {
   els.placementCursor.style.opacity = isBlocked ? "0.42" : "0.88";
   els.placementCursor.style.filter = `${isBlocked ? "grayscale(0.25) " : ""}brightness(${brightness.toFixed(3)}) contrast(1.03) saturate(1.02)`;
   els.placementCursor.style.transform = `translateX(-50%) scale(${scale})`;
+  els.sceneHint.textContent = `${getSceneDepthLabel(placementDepth)} - emplacement ${slotIndex + 1}${isBlocked ? " occupe" : " libre"}`;
 }
 
 async function placeSelectedDecor(event) {
@@ -4357,8 +4473,10 @@ async function placeSelectedDecor(event) {
   }
 
   const rect = els.aquariumStage.getBoundingClientRect();
-  const xPercent = clamp(((event.clientX - rect.left) / rect.width) * 100, 6, 94);
+  const rawXPercent = clamp(((event.clientX - rect.left) / rect.width) * 100, 6, 94);
   const placementDepth = normalizePlantDepth(runtime.selectedDepth);
+  const slotIndex = getNearestSceneSlotIndex(rawXPercent, placementDepth, 1);
+  const xPercent = getSceneSlotCenterPercent(placementDepth, slotIndex, 1);
   const yPercent = getPlantSoilY(placementDepth);
   const selection = parsePlacementKey(runtime.selectedPlacementKey);
   const movingPlant = runtime.movingPlantId
@@ -4378,7 +4496,7 @@ async function placeSelectedDecor(event) {
   }
 
   if (scenePlacementCollidesAt(xPercent, yPercent, placementDepth, selectedSpeciesId, "plant", runtime.movingPlantId)) {
-    toast("Impossible de superposer deux elements de scene sur le meme plan.");
+    toast(`${getSceneDepthLabel(placementDepth)} - emplacement ${slotIndex + 1} deja occupe.`);
     return;
   }
 
@@ -4680,7 +4798,7 @@ async function advanceCycle() {
   if (
     await runServerBridgeAction(
       (bridge) => bridge.advanceCycle(state.selectedAquariumId),
-      "Le cycle suivant commence immediatement."
+      "Le cycle suivant commence immediatement, sans consommer de temps."
     )
   ) {
     if (runtime.lastServerActionSucceeded && getOnboardingState().step === 8) {
@@ -4704,7 +4822,7 @@ async function advanceCycle() {
     state.aquarium.phLevel = clamp(state.aquarium.phLevel - 1, 5.5, 8.5);
     persistSelectedAquariumState(state);
   }
-  commit("Le cycle suivant commence immediatement.");
+  commit("Le cycle suivant commence immediatement, sans consommer de temps.");
   if (getOnboardingState().step === 8) {
     await advanceOnboardingTo(9);
   }
