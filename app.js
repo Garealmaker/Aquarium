@@ -1588,8 +1588,8 @@ function getPlantFloorOffset(plantOrSpecies, depth, scaleFactor = 1) {
 
 function getPlantSoilY(depth = DEPTH_MID) {
   const soilLineByDepth = {
-    [DEPTH_FRONT]: 85.2,
-    [DEPTH_MID]: 83.4,
+    [DEPTH_FRONT]: 85.6,
+    [DEPTH_MID]: 83.8,
     [DEPTH_BACK]: 82.4,
   };
   return soilLineByDepth[depth] || soilLineByDepth[DEPTH_MID];
