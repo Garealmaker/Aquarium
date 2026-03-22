@@ -55,8 +55,8 @@ const LEGACY_PLANT_SPECIES_MAP = {
 const ALLOWED_PLANT_DEPTHS = [DEPTH_FRONT, DEPTH_MID];
 const SCENE_DEPTH_SLOT_COUNT = 6;
 const SCENE_SLOT_CENTERS = {
-  [DEPTH_FRONT]: [11, 27, 43, 59, 75, 91],
-  [DEPTH_MID]: [11, 27, 43, 59, 75, 91],
+  [DEPTH_FRONT]: [10, 26, 42, 58, 74, 90],
+  [DEPTH_MID]: [12, 28, 44, 60, 76, 92],
 };
 const MAX_AQUARIUMS = 4;
 const CYCLE_MINUTES = 120;
@@ -1587,8 +1587,8 @@ function getPlantFloorOffset(plantOrSpecies, depth, scaleFactor = 1) {
 
 function getPlantSoilY(depth = DEPTH_MID) {
   const soilLineByDepth = {
-    [DEPTH_FRONT]: 83.8,
-    [DEPTH_MID]: 83.2,
+    [DEPTH_FRONT]: 85.1,
+    [DEPTH_MID]: 80.9,
     [DEPTH_BACK]: 82.4,
   };
   return soilLineByDepth[depth] || soilLineByDepth[DEPTH_MID];

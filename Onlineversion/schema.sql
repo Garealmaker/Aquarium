@@ -171,7 +171,11 @@ alter table public.owned_plants add column if not exists dark_cycle_streak integ
 update public.owned_plants
 set
   depth = case when depth = 1 then 1 else 2 end,
-  x_percent = 11 + greatest(0, least(5, round((coalesce(x_percent, 11) - 11) / 16.0)::integer)) * 16
+  x_percent =
+    case
+      when depth = 1 then 10 + greatest(0, least(5, round((coalesce(x_percent, 10) - 10) / 16.0)::integer)) * 16
+      else 12 + greatest(0, least(5, round((coalesce(x_percent, 12) - 12) / 16.0)::integer)) * 16
+    end
 where true;
 
 create table if not exists public.fry_batches (
@@ -2753,9 +2757,10 @@ declare
   plant_record public.owned_plants%rowtype;
   aquarium_record public.aquariums%rowtype;
   normalized_depth integer := case when target_depth = 1 then 1 else 2 end;
-  normalized_x_seed numeric := greatest(11, least(91, coalesce(target_x_percent, 43)));
-  normalized_slot_index integer := greatest(0, least(5, round((normalized_x_seed - 11) / 16.0)::integer));
-  normalized_x numeric := 11 + normalized_slot_index * 16;
+  normalized_x_seed numeric := coalesce(target_x_percent, case when target_depth = 1 then 42 else 44 end);
+  slot_origin numeric := case when target_depth = 1 then 10 else 12 end;
+  normalized_slot_index integer := 0;
+  normalized_x numeric := 0;
   effective_aquarium_id uuid;
   conflicting_plant_id uuid;
 begin
@@ -2775,6 +2780,10 @@ begin
   if plant_record.id is null then
     raise exception 'Plante introuvable ou non autorisee';
   end if;
+
+  normalized_x_seed := greatest(slot_origin, least(slot_origin + 80, normalized_x_seed));
+  normalized_slot_index := greatest(0, least(5, round((normalized_x_seed - slot_origin) / 16.0)::integer));
+  normalized_x := slot_origin + normalized_slot_index * 16;
 
   effective_aquarium_id := coalesce(target_aquarium_id, plant_record.aquarium_id);
 
